@@ -1,0 +1,190 @@
+{
+  "projectType": "saas",
+  "projectName": "SMAF",
+  "projectDescription": "Internal expense and travel allowance control system for the Mexican Federal Public Administration (APF)",
+  "theme": "linden",
+  "primaryColor": "#1e4d8b",
+  "lightColor": "#3b7dd6",
+  "darkColor": "#0f2a4d",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "overview",
+              "architecture"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "user-guide/authentication",
+              "user-guide/dashboard",
+              "user-guide/navigation"
+            ]
+          },
+          {
+            "group": "Solicitudes",
+            "pages": [
+              "solicitudes/overview",
+              "solicitudes/comision-requests",
+              "solicitudes/psp-requests"
+            ]
+          },
+          {
+            "group": "Comprobaciones",
+            "pages": [
+              "comprobaciones/overview",
+              "comprobaciones/expense-verification",
+              "comprobaciones/xml-invoices",
+              "comprobaciones/international-travel"
+            ]
+          },
+          {
+            "group": "Autorizaciones",
+            "pages": [
+              "autorizaciones/overview",
+              "autorizaciones/approval-workflow"
+            ]
+          },
+          {
+            "group": "Pagos y Ministraciones",
+            "pages": [
+              "pagos/overview",
+              "pagos/payment-processing",
+              "ministraciones/overview",
+              "ministraciones/fund-allocation"
+            ]
+          },
+          {
+            "group": "Reportes",
+            "pages": [
+              "reportes/overview",
+              "reportes/expense-reports",
+              "reportes/transparency-reports",
+              "reportes/financial-reports"
+            ]
+          },
+          {
+            "group": "Catalogos",
+            "pages": [
+              "catalogos/overview",
+              "catalogos/projects",
+              "catalogos/programs",
+              "catalogos/budget-items"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Technical Reference",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "technical/architecture-overview",
+              "technical/three-tier-architecture",
+              "technical/database-schema"
+            ]
+          },
+          {
+            "group": "Business Logic Layer",
+            "pages": [
+              "technical/brl/overview",
+              "technical/brl/commission-management",
+              "technical/brl/verification-management",
+              "technical/brl/payment-management"
+            ]
+          },
+          {
+            "group": "Data Access Layer",
+            "pages": [
+              "technical/dal/overview",
+              "technical/dal/database-connection",
+              "technical/dal/data-operations"
+            ]
+          },
+          {
+            "group": "Entities",
+            "pages": [
+              "technical/entities/overview",
+              "technical/entities/comision",
+              "technical/entities/comprobacion",
+              "technical/entities/usuario"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "technical/integration/cfdi-xml",
+              "technical/integration/sat-validation",
+              "technical/integration/email-notifications"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Administration",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "admin/installation",
+              "admin/configuration",
+              "admin/database-setup"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "admin/user-management",
+              "admin/permissions",
+              "admin/encryption"
+            ]
+          },
+          {
+            "group": "Maintenance",
+            "pages": [
+              "admin/backup-restore",
+              "admin/monitoring",
+              "admin/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Travel commission request and approval workflow",
+    "Expense verification with CFDI (XML invoice) validation",
+    "Multi-level authorization system (Requestor, Project Manager, Approver, Authorizer)",
+    "Payment processing and fund allocation (ministraciones)",
+    "Comprehensive reporting for transparency and financial control",
+    "Budget item and project management catalogs",
+    "Integration with Mexican SAT (Tax Administration Service) for invoice validation",
+    "Role-based access control and user permissions",
+    "PDF report generation for official documents",
+    "Email notifications for workflow events"
+  ],
+  "publicApiSurface": [
+    "Login and authentication system",
+    "Solicitud_Comision - Travel commission request form",
+    "SolicitudPSP - PSP request form",
+    "Comision_Comprobacion - Expense verification interface",
+    "ComprobacionAdmin - Administrative expense verification",
+    "Comision_Aut - Commission authorization",
+    "Pagos_Viaticos - Travel allowance payments",
+    "Alta_Ministracion - Fund allocation management",
+    "Reporte_Viaticos - Travel expense reports",
+    "Transparencia - Transparency reports",
+    "Alta_Proyectos - Project catalog management",
+    "Alta_Programas - Program catalog management",
+    "PEF - Annual budget management",
+    "GeneraReferencia - Bank reference generation",
+    "Monitoreo - System monitoring dashboard"
+  ]
+}
