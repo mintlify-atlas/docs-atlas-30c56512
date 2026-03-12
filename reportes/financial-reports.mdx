@@ -1,0 +1,643 @@
+---
+title: 'Reportes Financieros'
+description: 'Análisis presupuestario, reportes por programa y comparativos de consumo de recursos'
+icon: 'chart-line'
+---
+
+## Descripción General
+
+El módulo de Reportes Financieros permite analizar el consumo presupuestal por programa de investigación, comparar presupuesto autorizado vs. ejercido, y generar análisis comparativos mensuales para la toma de decisiones.
+
+## Tipos de Reportes Financieros
+
+<CardGroup cols={2}>
+  <Card title="Reporte de Programas" icon="folder-open">
+    Análisis de consumo presupuestal por programa con visualizaciones gráficas
+  </Card>
+  <Card title="Comparativo Mensual" icon="calendar">
+    Análisis de tendencias y comparación entre períodos
+  </Card>
+  <Card title="Presupuesto vs. Real" icon="scale-balanced">
+    Comparación de montos autorizados vs. comprobados
+  </Card>
+  <Card title="Reporte por Centro" icon="building">
+    Consolidado de gastos por centro de investigación
+  </Card>
+</CardGroup>
+
+## Reporte de Programas
+
+### Acceso al Módulo
+
+Navegue a **Reportes > Reporte de Programas** desde el menú principal.
+
+### Interfaz de Usuario
+
+```aspx
+<table style="width: 100%;">
+    <tr>
+        <td style="width: 15%;">
+            <asp:Label ID="Label1" runat="server" Text="Periodo"></asp:Label>
+        </td>
+        <td style="width: 70%;">
+            <asp:DropDownList ID="DdlPeriodo" runat="server" 
+                Width="100%" 
+                AutoPostBack="True" 
+                OnSelectedIndexChanged="DdlPeriodo_SelectedIndexChanged">
+            </asp:DropDownList>
+        </td>
+        <td style="width: 15%;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td>
+            <asp:Label ID="Label2" runat="server" Text="Programas"></asp:Label>
+        </td>
+        <td>
+            <asp:DropDownList ID="DdlProgramas" runat="server" 
+                Width="100%" 
+                AutoPostBack="True" 
+                OnSelectedIndexChanged="DdlProgramas_SelectedIndexChanged">
+            </asp:DropDownList>
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+    <tr>
+        <td>
+            <asp:Label ID="Label3" runat="server" Text="Usuarios"></asp:Label>
+        </td>
+        <td>
+            <asp:DropDownList ID="DdlUsuarios" runat="server" Width="100%">
+            </asp:DropDownList>
+        </td>
+        <td></td>
+    </tr>
+    <tr>
+        <td colspan="3" style="text-align: right">
+            <asp:Button ID="btnBuscar" runat="server" 
+                Text="Buscar" 
+                OnClick="btnBuscar_Click" />
+        </td>
+    </tr>
+</table>
+```
+
+### Carga de Datos Inicial
+
+<Steps>
+  <Step title="Cargar Períodos Fiscales">
+    ```csharp
+    private void cargaDatos()
+    {
+        string lsSession = Session["Crip_Rol"].ToString();
+        string lsUsuario = Session["Crip_Usuario"].ToString();
+        string lsUbicacion = Session["Crip_Ubicacion"].ToString();
+        
+        DdlPeriodo.DataSource = MngNegocioAnio.ObtieneAnios();
+        DdlPeriodo.DataTextField = Dictionary.DESCRIPCION;
+        DdlPeriodo.DataValueField = Dictionary.CODIGO;
+        DdlPeriodo.DataBind();
+    }
+    ```
+  </Step>
+  
+  <Step title="Cargar Programas al Seleccionar Período">
+    ```csharp
+    protected void DdlPeriodo_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        string lsUbicacion = Session["Crip_Ubicacion"].ToString();
+        string Periodo = DdlPeriodo.SelectedValue.ToString();
+        
+        if (Periodo == string.Empty)
+        {
+            DdlProgramas.Items.Clear();
+        }
+        else
+        {
+            DdlProgramas.DataSource = MngNegocioProyecto.ObtieneProyectos(
+                Session["Crip_Usuario"].ToString(), 
+                Session["Crip_Rol"].ToString(), 
+                lsUbicacion
+            );
+            DdlProgramas.DataTextField = "Descripcion";
+            DdlProgramas.DataValueField = "Codigo";
+            DdlProgramas.DataBind();
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Cargar Usuarios al Seleccionar Programa">
+    ```csharp
+    protected void DdlProgramas_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        string Periodo = DdlPeriodo.SelectedValue.ToString();
+        string[] lsCadena = DdlProgramas.SelectedValue.ToString().Split(new Char[] { '|' });
+        string Programas = lsCadena[0];
+        string Unidad = Session["Crip_Ubicacion"].ToString();
+        
+        DdlUsuarios.DataSource = MngNegocioUsuarios.UsuarioProyecto(
+            Periodo, 
+            Programas, 
+            Unidad, 
+            "1"
+        );
+        DdlUsuarios.DataTextField = Dictionary.DESCRIPCION;
+        DdlUsuarios.DataValueField = Dictionary.CODIGO;
+        DdlUsuarios.DataBind();
+    }
+    ```
+  </Step>
+</Steps>
+
+### Generación del Reporte
+
+#### Obtención de Datos del Programa
+
+```csharp
+protected void btnBuscar_Click(object sender, EventArgs e)
+{
+    string Periodo = DdlPeriodo.SelectedValue.ToString();
+    string Usuarios = DdlUsuarios.SelectedValue.ToString();
+    
+    string[] lsCadena = DdlProgramas.SelectedValue.ToString().Split(new Char[] { '|' });
+    string Programas = lsCadena[0];
+    
+    // Validaciones
+    if (Periodo == string.Empty)
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('Selecciona un Periodo');", 
+            true
+        );
+        return;
+    }
+    
+    if (Programas == Dictionary.CADENA_NULA)
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('Selecciona un Programa Valido');", 
+            true
+        );
+        return;
+    }
+    
+    // Obtener datos del programa
+    Proyecto Programa = MngNegocioProyecto.ObtieneDatosProy(
+        Session["Crip_Ubicacion"].ToString(), 
+        Programas, 
+        Periodo
+    );
+    
+    // Obtener datos de comisiones
+    ComisionProyecto oComisionProyecto = MngNegocioComision.RegresaDatos(
+        Programa.Periodo, 
+        Programa.Clv_Proy, 
+        Programa.Dependencia
+    );
+    
+    // Obtener totales pagados
+    Entidad TotalPagado = MngNegocioComprobacion.Obtiene_TotalPagado(
+        Programa.Periodo, 
+        Programa.Clv_Proy, 
+        Programa.Dependencia,
+        "2"
+    );
+    
+    // Obtener totales comprobados por concepto
+    string TotalComprobadoViaticos = MngNegocioComprobacion.Total_Comprobado(
+        Programa.Periodo, Programa.Clv_Proy, "VIATICOS"
+    );
+    string TotalComprobadoCombustible = MngNegocioComprobacion.Total_Comprobado(
+        Programa.Periodo, Programa.Clv_Proy, "COMBUSTIBLE"
+    );
+    string TotalComprobadoPeaje = MngNegocioComprobacion.Total_Comprobado(
+        Programa.Periodo, Programa.Clv_Proy, "PEAJE"
+    );
+    string TotalComprobadoPasaje = MngNegocioComprobacion.Total_Comprobado(
+        Programa.Periodo, Programa.Clv_Proy, "PASAJE"
+    );
+    string TotalComprobadoSingladuras = MngNegocioComprobacion.Total_Comprobado(
+        Programa.Periodo, Programa.Clv_Proy, "SINGLADURAS"
+    );
+    
+    // Generar gráficas
+    GenerarGraficaBarras(Programa, oComisionProyecto);
+    GenerarGraficaComparativa(Programa, TotalPagado, TotalComprobadoViaticos, 
+        TotalComprobadoCombustible, TotalComprobadoPeaje, 
+        TotalComprobadoPasaje, TotalComprobadoSingladuras);
+}
+```
+
+## Visualizaciones Gráficas
+
+### Gráfica de Barras - Presupuesto por Concepto
+
+```csharp
+private void GenerarGraficaBarras(Proyecto Programa, ComisionProyecto oComisionProyecto)
+{
+    Telerik.Web.UI.RadHtmlChart gf = new Telerik.Web.UI.RadHtmlChart();
+    
+    gf.Width = 900;
+    gf.Height = 400;
+    gf.Transitions = true;
+    gf.Skin = "Silk";
+    
+    gf.ChartTitle.Text = "REPORTE PROGRAMAS " + Programa.Total;
+    gf.ChartTitle.Appearance.Align = Telerik.Web.UI.HtmlChart.ChartTitleAlign.Center;
+    gf.ChartTitle.Appearance.Position = Telerik.Web.UI.HtmlChart.ChartTitlePosition.Top;
+    gf.ChartTitle.Appearance.BackgroundColor = Color.LightBlue;
+    
+    gf.Legend.Appearance.Position = Telerik.Web.UI.HtmlChart.ChartLegendPosition.Right;
+    gf.Legend.Appearance.Visible = true;
+    
+    Telerik.Web.UI.ColumnSeries dn = new Telerik.Web.UI.ColumnSeries();
+    dn.Appearance.FillStyle.BackgroundColor = Color.White;
+    
+    dn.LabelsAppearance.DataFormatString = "${0}";
+    dn.LabelsAppearance.Visible = true;
+    dn.LabelsAppearance.Position = Telerik.Web.UI.HtmlChart.BarColumnLabelsPosition.Center;
+    
+    gf.PlotArea.XAxis.TitleAppearance.Position = Telerik.Web.UI.HtmlChart.AxisTitlePosition.Center;
+    gf.PlotArea.XAxis.TitleAppearance.Text = "TOTALES";
+    gf.PlotArea.XAxis.MajorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    gf.PlotArea.XAxis.MinorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    
+    gf.PlotArea.YAxis.TitleAppearance.Position = Telerik.Web.UI.HtmlChart.AxisTitlePosition.Center;
+    gf.PlotArea.YAxis.TitleAppearance.Text = "REPORTE PRUEBAS";
+    gf.PlotArea.YAxis.MajorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    gf.PlotArea.YAxis.MinorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    gf.PlotArea.YAxis.MajorTickSize = 5;
+    
+    dn.TooltipsAppearance.BackgroundColor = Color.LawnGreen;
+    dn.TooltipsAppearance.DataFormatString = "${0}";
+    
+    // Total del programa
+    Telerik.Web.UI.CategorySeriesItem tc = new Telerik.Web.UI.CategorySeriesItem();
+    tc.Y = Convert.ToDecimal(Programa.Total);
+    tc.BackgroundColor = Color.LightSeaGreen;
+    dn.SeriesItems.Add(tc);
+    
+    // Agregar conceptos si tienen valor
+    if (clsFuncionesGral.Convert_Double(oComisionProyecto.Combustible) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem cm = new Telerik.Web.UI.CategorySeriesItem();
+        cm.Y = Convert.ToDecimal(oComisionProyecto.Combustible);
+        cm.BackgroundColor = Color.LightBlue;
+        dn.SeriesItems.Add(cm);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(oComisionProyecto.Peaje) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem pe = new Telerik.Web.UI.CategorySeriesItem();
+        pe.Y = Convert.ToDecimal(oComisionProyecto.Peaje);
+        pe.BackgroundColor = Color.LightPink;
+        dn.SeriesItems.Add(pe);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(oComisionProyecto.Pasaje) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem pa = new Telerik.Web.UI.CategorySeriesItem();
+        pa.Y = Convert.ToDecimal(oComisionProyecto.Pasaje);
+        pa.BackgroundColor = Color.MediumPurple;
+        dn.SeriesItems.Add(pa);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(oComisionProyecto.Singladuras) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem sg = new Telerik.Web.UI.CategorySeriesItem();
+        sg.Y = Convert.ToDecimal(oComisionProyecto.Singladuras);
+        sg.BackgroundColor = Color.OliveDrab;
+        dn.SeriesItems.Add(sg);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(oComisionProyecto.Totalviaticos) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem tv = new Telerik.Web.UI.CategorySeriesItem();
+        tv.Y = Convert.ToDecimal(oComisionProyecto.Totalviaticos);
+        tv.BackgroundColor = Color.Yellow;
+        dn.SeriesItems.Add(tv);
+    }
+    
+    dn.Appearance.FillStyle.BackgroundColor = Color.Transparent;
+    gf.PlotArea.Series.Add(dn);
+    
+    pnlContenedor.Controls.Add(gf);
+}
+```
+
+### Gráfica Comparativa - Solicitado vs. Comprobado
+
+```csharp
+private void GenerarGraficaComparativa(
+    Proyecto Programa, 
+    Entidad TotalPagado,
+    string TotalComprobadoViaticos,
+    string TotalComprobadoCombustible,
+    string TotalComprobadoPeaje,
+    string TotalComprobadoPasaje,
+    string TotalComprobadoSingladuras)
+{
+    Telerik.Web.UI.RadHtmlChart fg = new Telerik.Web.UI.RadHtmlChart();
+    
+    fg.Width = 900;
+    fg.Height = 350;
+    fg.Transitions = true;
+    fg.Skin = "Silk";
+    
+    fg.ChartTitle.Text = "TOTAL SOLICITADO/TOTAL COMPROBADO";
+    fg.ChartTitle.Appearance.Align = Telerik.Web.UI.HtmlChart.ChartTitleAlign.Center;
+    fg.ChartTitle.Appearance.Position = Telerik.Web.UI.HtmlChart.ChartTitlePosition.Top;
+    fg.ChartTitle.Appearance.BackgroundColor = Color.LightBlue;
+    
+    fg.Legend.Appearance.Position = Telerik.Web.UI.HtmlChart.ChartLegendPosition.Right;
+    fg.Legend.Appearance.Visible = true;
+    
+    Telerik.Web.UI.ColumnSeries cl = new Telerik.Web.UI.ColumnSeries();
+    cl.Appearance.FillStyle.BackgroundColor = Color.White;
+    
+    cl.LabelsAppearance.DataFormatString = "${0}";
+    cl.LabelsAppearance.Visible = true;
+    cl.LabelsAppearance.Position = Telerik.Web.UI.HtmlChart.BarColumnLabelsPosition.Center;
+    
+    fg.PlotArea.XAxis.TitleAppearance.Position = Telerik.Web.UI.HtmlChart.AxisTitlePosition.Center;
+    fg.PlotArea.XAxis.TitleAppearance.Text = "TOTALES COMPROBADOS";
+    fg.PlotArea.XAxis.MajorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    fg.PlotArea.XAxis.MinorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    
+    fg.PlotArea.YAxis.TitleAppearance.Position = Telerik.Web.UI.HtmlChart.AxisTitlePosition.Center;
+    fg.PlotArea.YAxis.TitleAppearance.Text = "TOTALES";
+    fg.PlotArea.YAxis.MajorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    fg.PlotArea.YAxis.MinorTickType = Telerik.Web.UI.HtmlChart.TickType.Outside;
+    fg.PlotArea.YAxis.MajorTickSize = 5;
+    
+    cl.TooltipsAppearance.BackgroundColor = Color.Aqua;
+    cl.TooltipsAppearance.DataFormatString = "${0}";
+    
+    // Total solicitado
+    Telerik.Web.UI.CategorySeriesItem cs = new Telerik.Web.UI.CategorySeriesItem();
+    cs.Y = Convert.ToDecimal(Programa.Total);
+    cs.BackgroundColor = Color.LightSeaGreen;
+    cl.SeriesItems.Add(cs);
+    
+    // Total pagado
+    if (clsFuncionesGral.Convert_Double(TotalPagado.Codigo) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem cm = new Telerik.Web.UI.CategorySeriesItem();
+        cm.Y = Convert.ToDecimal(TotalPagado.Codigo);
+        cm.BackgroundColor = Color.LightBlue;
+        cl.SeriesItems.Add(cm);
+    }
+    
+    // Comprobaciones por concepto
+    if (clsFuncionesGral.Convert_Double(TotalComprobadoViaticos) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem pe = new Telerik.Web.UI.CategorySeriesItem();
+        pe.Y = Convert.ToDecimal(TotalComprobadoViaticos);
+        pe.BackgroundColor = Color.LightPink;
+        cl.SeriesItems.Add(pe);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(TotalComprobadoCombustible) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem pa = new Telerik.Web.UI.CategorySeriesItem();
+        pa.Y = Convert.ToDecimal(TotalComprobadoCombustible);
+        pa.BackgroundColor = Color.MediumPurple;
+        cl.SeriesItems.Add(pa);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(TotalComprobadoPeaje) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem sg = new Telerik.Web.UI.CategorySeriesItem();
+        sg.Y = Convert.ToDecimal(TotalComprobadoPeaje);
+        sg.BackgroundColor = Color.OliveDrab;
+        cl.SeriesItems.Add(sg);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(TotalComprobadoPasaje) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem tv = new Telerik.Web.UI.CategorySeriesItem();
+        tv.Y = Convert.ToDecimal(TotalComprobadoPasaje);
+        tv.BackgroundColor = Color.Yellow;
+        cl.SeriesItems.Add(tv);
+    }
+    
+    if (clsFuncionesGral.Convert_Double(TotalComprobadoSingladuras) > 0)
+    {
+        Telerik.Web.UI.CategorySeriesItem tv = new Telerik.Web.UI.CategorySeriesItem();
+        tv.Y = Convert.ToDecimal(TotalComprobadoSingladuras);
+        tv.BackgroundColor = Color.Red;
+        cl.SeriesItems.Add(tv);
+    }
+    
+    cl.Appearance.FillStyle.BackgroundColor = Color.Transparent;
+    fg.PlotArea.Series.Add(cl);
+    
+    Panel1.Controls.Add(fg);
+}
+```
+
+## Reporte Comparativo Mensual
+
+### Descripción
+
+Permite comparar el consumo de recursos entre diferentes períodos mensuales, útil para:
+- Análisis de tendencias
+- Identificación de picos de gasto
+- Planificación presupuestal
+- Detección de anomalías
+
+### Filtros Disponibles
+
+<Tabs>
+  <Tab title="Período">
+    ```csharp
+    Label2.Text = "Seleccione periodo mensual:";
+    clsFuncionesGral.Llena_Lista(dplMes1, 
+        "=SELECCIONE=|ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE"
+    );
+    
+    dplAnios.DataSource = MngNegocioAnio.ObtieneAnios();
+    dplAnios.DataTextField = dictionary.DESCRIPCION;
+    dplAnios.DataValueField = dictionary.CODIGO;
+    dplAnios.DataBind();
+    ```
+  </Tab>
+  
+  <Tab title="Tipo de Viáticos">
+    ```csharp
+    Label5.Text = clsFuncionesGral.ConvertMayus("Tipo Viaticos:");
+    dplTipoViaticos.DataSource = MngNegocioViaticos.Metodo_Viaticos(true);
+    dplTipoViaticos.DataTextField = dictionary.DESCRIPCION;
+    dplTipoViaticos.DataValueField = dictionary.CODIGO;
+    dplTipoViaticos.DataBind();
+    ```
+  </Tab>
+  
+  <Tab title="Estatus">
+    ```csharp
+    Label7.Text = clsFuncionesGral.ConvertMayus("Estatus Comprobacion :");
+    dplEstatusComp.DataSource = MngNegocioComision.ObtieneTipoComprobacion();
+    dplEstatusComp.DataTextField = dictionary.DESCRIPCION;
+    dplEstatusComp.DataValueField = dictionary.CODIGO;
+    dplEstatusComp.DataBind();
+    
+    Label8.Text = clsFuncionesGral.ConvertMayus("estatus Financiero :");
+    clsFuncionesGral.Llena_Lista(dplFInanciero, 
+        clsFuncionesGral.ConvertMayus("= s e l e c c i o n e =|comprometido|prepagado|pagado|pagado pasivo")
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### Modo Comparativo
+
+Active el modo comparativo para analizar dos períodos:
+
+```csharp
+protected void CheckBox1_CheckedChanged(object sender, EventArgs e)
+{
+    if (CheckBox1.Checked)
+    {
+        clsFuncionesGral.Activa_Paneles(pnlMes2, true, true);
+    }
+    else
+    {
+        clsFuncionesGral.Activa_Paneles(pnlMes2, true, false);
+    }
+}
+```
+
+### Validaciones Comparativas
+
+```csharp
+if ((CheckBox1.Checked) && (pnlMes2.Enabled))
+{
+    // No puede comparar un mes contra un año completo
+    if ((dplMes1.SelectedIndex == 0) && (dplMes2.SelectedIndex != 0))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('No puede comparar un mes contra un año completo');", 
+            true
+        );
+        return;
+    }
+    else if ((dplMes1.SelectedIndex != 0) && (dplMes2.SelectedIndex == 0))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('No puede comparar un mes contra un año completo');", 
+            true
+        );
+        return;
+    }
+    
+    // Verificar compatibilidad de programas
+    if ((isDireccion) && (!isDireccion1))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('No puede comparar todos los programas de una direccion contra proyecto de crip ');", 
+            true
+        );
+        return;
+    }
+    
+    // Verificar usuarios
+    if ((dplUsuarios.SelectedIndex == 0) && (dplUsuarios1.SelectedIndex > 0))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('No puede comparar todos los usuarios de un mes contra uno solo de otro');", 
+            true
+        );
+        return;
+    }
+}
+```
+
+## Estructura de Datos de Reportes
+
+### ComisionProyecto
+
+```csharp
+public class ComisionProyecto
+{
+    public string Combustible { get; set; }
+    public string Peaje { get; set; }
+    public string Pasaje { get; set; }
+    public string Singladuras { get; set; }
+    public string Totalviaticos { get; set; }
+    public string GranTotal { get; set; }
+}
+```
+
+### ComisionComparativo
+
+```csharp
+public class ComisionComparativo
+{
+    public string Oficio { get; set; }
+    public string Archivo { get; set; }
+    public string Comisionado { get; set; }
+    public string Lugar { get; set; }
+    public string Inicio { get; set; }
+    public string Final { get; set; }
+    public string Viaticos { get; set; }
+    public string Combustible { get; set; }
+    public string Peaje { get; set; }
+    public string Pasaje { get; set; }
+    public string Singladuras { get; set; }
+}
+```
+
+## Mejores Prácticas
+
+<AccordionGroup>
+  <Accordion title="Análisis Presupuestario">
+    - Genere reportes mensuales para monitoreo continuo
+    - Compare presupuesto vs. real trimestralmente
+    - Identifique proyectos con bajo ejercicio presupuestal
+    - Analice tendencias para planificación futura
+  </Accordion>
+  
+  <Accordion title="Interpretación de Gráficas">
+    - Verde (LightSeaGreen): Total del programa
+    - Azul (LightBlue): Combustible
+    - Rosa (LightPink): Peajes
+    - Morado (MediumPurple): Pasajes
+    - Verde olivo (OliveDrab): Singladuras
+    - Amarillo: Viáticos
+  </Accordion>
+  
+  <Accordion title="Frecuencia de Generación">
+    - **Mensual**: Para seguimiento operativo
+    - **Trimestral**: Para reportes ejecutivos
+    - **Anual**: Para cierre de ejercicio fiscal
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Reportes de Viáticos" icon="file-invoice-dollar" href="./expense-reports">
+    Reportes detallados de gastos de viaje
+  </Card>
+  <Card title="Reportes de Transparencia" icon="eye" href="./transparency-reports">
+    Cumplimiento regulatorio y transparencia
+  </Card>
+  <Card title="Proyectos" icon="folder-open" href="../proyectos/overview">
+    Gestión de programas y presupuestos
+  </Card>
+  <Card title="Presupuestos" icon="coins" href="../proyectos/presupuestos">
+    Administración de recursos presupuestales
+  </Card>
+</CardGroup>

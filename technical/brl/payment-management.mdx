@@ -1,0 +1,667 @@
+---
+title: "Payment Management"
+description: "Payment processing, bank reference generation, and budget allocation management"
+---
+
+## Overview
+
+Payment management in SMAF is handled by two complementary BRL classes:
+
+- **MngNegocioPago**: Commission payment queries and disbursement tracking
+- **MngNegocioMinistracion**: Budget allocation management and fund release processing
+
+These classes coordinate to ensure proper financial controls, budget tracking, and payment execution for both travel allowances and operational expenses.
+
+## MngNegocioPago - Commission Payments
+
+**Source File**: `InapescaWeb.BRL/MngNegocioPago.cs`  
+**Author**: Juan Antonio López López (CRIP Salina Cruz)  
+**Created**: November 2015
+
+### Core Payment Queries
+
+#### List Commissions Pending Payment
+
+Retrieve all verified commissions ready for disbursement:
+
+```csharp
+public static List<Entidad> ListaComisionesPagar(
+    string psUbicacion, 
+    string psUbicacionProyecto = "", 
+    string psPeriodo = "", 
+    bool psPagador = false)
+```
+
+<ParamField path="psUbicacion" type="string" required>
+  Department location code (e.g., `CRIP-SC`, `OF-CENTRALES`)
+</ParamField>
+
+<ParamField path="psUbicacionProyecto" type="string">
+  Filter by project location if specified
+</ParamField>
+
+<ParamField path="psPeriodo" type="string">
+  Fiscal period (format: `YYYY`) - defaults to current year
+</ParamField>
+
+<ParamField path="psPagador" type="bool">
+  If `true`, returns only commissions assigned to the current financial officer
+</ParamField>
+
+**Returns**: List of `Entidad` objects with:
+- `Clave`: Commission archive ID
+- `Descripcion`: Employee name and commission details
+- `Valor`: Total amount to disburse
+- `Fecha`: Verification approval date
+
+#### Retrieve Payment Details
+
+Get full commission payment information:
+
+```csharp
+public static List<Pagos> Comisiones_Pagar(
+    string psUbicacion,
+    string psPeriodo = "")
+```
+
+Returns `Pagos` entity with:
+- Employee bank account details (CLABE, bank name)
+- Verified expense breakdown
+- Payment status and method
+- Reference numbers
+
+<Info>
+  The `Pagos` entity includes **encrypted bank account information** that is decrypted only during payment file generation.
+</Info>
+
+### Payment Workflow Integration
+
+Typical payment processing sequence:
+
+```csharp
+// Step 1: Get list of pending payments
+List<Entidad> pendingPayments = MngNegocioPago.ListaComisionesPagar(
+    psUbicacion: "CRIP-SC",
+    psPeriodo: "2024",
+    psPagador: true
+);
+
+// Step 2: For each payment, get detailed information
+foreach (var payment in pendingPayments)
+{
+    List<Pagos> paymentDetails = MngNegocioPago.Comisiones_Pagar(
+        psUbicacion: "CRIP-SC",
+        psPeriodo: "2024"
+    );
+    
+    // Step 3: Generate bank reference
+    string referencia = MngNegocioGenerarRef.Obtiene_Max_Referencia();
+    
+    // Step 4: Insert reference record
+    MngNegocioGenerarRef.Inserta_Referencia(referenciaObject);
+    
+    // Step 5: Update commission payment status
+    MngNegocioComision.Update_estatus_Comision(
+        psEstatus: "PAGADA",
+        psArchivo: payment.Clave,
+        psFolio: payment.Folio
+    );
+}
+```
+
+## MngNegocioMinistracion - Budget Allocations
+
+**Source File**: `InapescaWeb.BRL/MngNegocioMinistracion.cs`  
+**Author**: Juan Antonio López López (CRIP Salina Cruz)  
+**Created**: February 2016
+
+Ministraciones are **budget fund releases** to vendors or service providers for operational expenses (not travel commissions).
+
+### Create Budget Allocation
+
+Insert a new ministracion record:
+
+```csharp
+public static Boolean Inserta_Ministracion(
+    string psTipoMinistracion, 
+    string psClvPeriodo, 
+    string psFolio, 
+    string psFecha, 
+    string psPeriodo, 
+    string psUsuario, 
+    string psFechaAut, 
+    string psAutoriza, 
+    string psFechaPago, 
+    string psUsuarioPagador, 
+    string psUbicacion, 
+    string psProyecto, 
+    string psUbicaProy, 
+    string psDocumento, 
+    string psArchivo, 
+    string psTipoPago, 
+    string psRefBanc, 
+    string psBanco, 
+    string psCuenta, 
+    string psClabe, 
+    string psRazon, 
+    string psRFC, 
+    string psOficio, 
+    string psFechaEmision, 
+    string psClvConcepto, 
+    string psConcepto, 
+    string psSubtotal, 
+    string psIVA, 
+    string psTUA, 
+    string psSFP, 
+    string psISR, 
+    string psTotalPagar, 
+    string psIvaRet, 
+    string psIsrRet, 
+    string psTuaRet, 
+    string psSfpRet, 
+    string psDescuentos, 
+    string psTotalPagado, 
+    string psFechaRecep, 
+    string psComponente, 
+    string psPartida, 
+    string psEstatus, 
+    string psSecuencia, 
+    string psObservaciones, 
+    string psBancoOrigen, 
+    string psCuentaOrigen, 
+    string psClabeOrigen)
+```
+
+<ParamField path="psTipoMinistracion" type="string" required>
+  Allocation type:
+  - `SERVICIOS`: Professional services
+  - `SUMINISTROS`: Supplies and materials
+  - `ARRENDAMIENTO`: Lease payments
+  - `MANTENIMIENTO`: Maintenance and repairs
+</ParamField>
+
+<ParamField path="psRazon" type="string" required>
+  Vendor legal name (razón social)
+</ParamField>
+
+<ParamField path="psRFC" type="string" required>
+  Vendor tax ID (Registro Federal de Contribuyentes)
+</ParamField>
+
+<ParamField path="psTotalPagar" type="string" required>
+  Gross invoice amount before withholdings
+</ParamField>
+
+<ParamField path="psTotalPagado" type="string" required>
+  Net amount to disburse after withholdings
+</ParamField>
+
+### Retrieve Ministracion Details
+
+```csharp
+public static Ministracion Objeto_Ministracion(
+    string psArchivo, 
+    string psMinistracion, 
+    string psConcepto, 
+    bool pbBandera = false)
+```
+
+<ParamField path="psArchivo" type="string" required>
+  Archive identifier (unique instance ID)
+</ParamField>
+
+<ParamField path="psMinistracion" type="string" required>
+  Ministracion folio number
+</ParamField>
+
+<ParamField path="psConcepto" type="string" required>
+  Expense concept code
+</ParamField>
+
+<ParamField path="pbBandera" type="bool">
+  If `true`, includes tax calculation details
+</ParamField>
+
+### Update Payment Status
+
+Update ministracion after payment execution:
+
+```csharp
+public static bool Update_MInistracion(
+    string psPartida,
+    string psEstatus, 
+    string psPagado, 
+    string psFecha, 
+    string psUsuarioPagador, 
+    string psBancoOrigen, 
+    string psCuentaOrigen, 
+    string psClabeOrigen, 
+    string psBancoDestino, 
+    string psCuentaDestino, 
+    string psClabeDestino, 
+    string psRefBancaria, 
+    string psDocumento, 
+    string psMinistracion, 
+    string psConcepto, 
+    string psRazonSocial, 
+    bool psRFC = false)
+```
+
+<ResponseField name="psEstatus" type="string">
+  Payment status:
+  - `SOLICITADA`: Submitted, pending approval
+  - `AUTORIZADA`: Approved for payment
+  - `PAGADA`: Payment executed
+  - `RECHAZADA`: Rejected
+  - `CANCELADA`: Cancelled
+</ResponseField>
+
+<ResponseField name="psRefBancaria" type="string">
+  Bank reference number generated for tracking
+</ResponseField>
+
+### List Ministraciones
+
+Query ministracion records:
+
+```csharp
+public static List<Entidad> Obtiene_Ministracion(
+    string psPeriodo, 
+    string psArchivo)
+```
+
+Returns list of ministraciones for specified period and archive.
+
+### Solicited Items Detail
+
+```csharp
+public static List<Entidad> ListaMinistracionesSolicitadas(
+    string psArchivo, 
+    string psMinistracion)
+```
+
+Returns line items for a ministracion (useful for multi-item invoices).
+
+## Bank Reference Generation
+
+**Source File**: `InapescaWeb.BRL/MngNegocioGenerarRef.cs`
+
+The reference generation system creates unique payment tracking identifiers.
+
+### Generate New Reference Number
+
+```csharp
+public static string Obtiene_Max_Referencia()
+```
+
+Returns next available reference number in format: `YYYYMMDD-####`
+
+Example: `20240315-0042`
+
+### Insert Reference Record
+
+Create payment reference record:
+
+```csharp
+public static Boolean Inserta_Referencia(GenerarRef oRefencia)
+```
+
+<ParamField path="oRefencia" type="GenerarRef" required>
+  Reference entity with:
+  - `Referencia`: Generated reference number
+  - `Archivo`: Commission archive ID
+  - `Folio`: Commission folio
+  - `TotalPagar`: Amount to disburse
+  - `FechaGeneracion`: Reference creation date
+  - `Estatus`: `GENERADA`, `PAGADA`, `CANCELADA`
+</ParamField>
+
+### Insert Reference Details
+
+For itemized payment references:
+
+```csharp
+public static Boolean Inserta_Referencia_Detalles(GenerarRef oRefencia)
+```
+
+Stores line-item breakdown of payment components (useful for multi-concept payments).
+
+### Retrieve Reference Information
+
+Query existing references:
+
+```csharp
+public static List<GenerarRef> Obten_Informacion_Referencia(
+    string psArchivo)
+```
+
+Returns all references associated with a commission archive.
+
+### Retrieve Reference Details
+
+```csharp
+public static List<GenerarRef> Obten_Informacion_ReferenciaDetalles(
+    string psID, 
+    string psReferencia, 
+    bool boolID)
+```
+
+<ParamField path="boolID" type="bool">
+  If `true`, query by internal ID; if `false`, query by reference number
+</ParamField>
+
+### Update Reference Status
+
+Update reference after payment confirmation:
+
+```csharp
+public static Boolean Update_UpdateReferencia(
+    string sIdExistente, 
+    string sReferenciaExiste, 
+    string ESTATUS)
+```
+
+### Update with Payment Confirmation
+
+```csharp
+public static Boolean Update_UpdateReferenciaGenerada(
+    string sReferencia, 
+    string sImportePagado, 
+    string sFechaPago)
+```
+
+Records actual payment date and amount (useful for bank reconciliation).
+
+## Payment Type Catalog
+
+```csharp
+public static List<Entidad> Lista_tipo_Pagos()
+```
+
+Returns payment method catalog:
+
+| Code | Description | Processing Time |
+|------|-------------|----------------|
+| DEPOSITO | Direct bank deposit | 24-48 hours |
+| TRANSFERENCIA | Electronic transfer | Same day |
+| CHEQUE | Physical check | 3-5 days |
+| SPEI | SPEI interbank transfer | Immediate |
+
+## Payment Comparison and Validation
+
+### Paid vs. To Pay
+
+```csharp
+public static Entidad PagadoVsPagar(
+    string psArchivo, 
+    string psMinistracion)
+```
+
+Returns entity with:
+- `TotalSolicitado`: Requested amount
+- `TotalPagado`: Disbursed amount
+- `Pendiente`: Remaining balance
+
+<Info>
+  This method is critical for **partial payment tracking** when ministraciones are paid in installments.
+</Info>
+
+### Update Status by Concept
+
+```csharp
+public static bool UpdateEstatusMinistracion(
+    string psEstatus, 
+    string psArchivo, 
+    string psMinistracion, 
+    string psConcepto)
+```
+
+Updates status for specific expense concept within a ministracion.
+
+## Fiscal Period Management
+
+### Obtain Period Code
+
+```csharp
+public static string Obtiene_ClvPeriodo(
+    string psFecha, 
+    string psYear)
+```
+
+Converts date to fiscal period code (used for budget tracking):
+
+| Date Range | Period Code |
+|-----------|-------------|
+| Jan 1 - Mar 31 | Q1 |
+| Apr 1 - Jun 30 | Q2 |
+| Jul 1 - Sep 30 | Q3 |
+| Oct 1 - Dec 31 | Q4 |
+
+### Check Archive in Ministracion
+
+```csharp
+public static string ArchivoInMinistracion(string psArchivo)
+```
+
+Returns `"1"` if archive has associated ministraciones, `"0"` otherwise.
+
+## Ministracion Types Catalog
+
+```csharp
+public static List<Entidad> ListaTipoMinistracion(string psOpcion)
+```
+
+<ParamField path="psOpcion" type="string">
+  Filter option:
+  - `TODOS`: All ministracion types
+  - `FACTURABLE`: Only types requiring CFDI invoice
+  - `NO_FACTURABLE`: Types allowing simplified receipts
+</ParamField>
+
+## Tax Withholding Calculations
+
+Ministraciones automatically calculate tax withholdings:
+
+### Common Withholding Rates
+
+- **IVA (VAT)**: 16% (2/3 withheld = 10.67%)
+- **ISR (Income Tax)**: Varies by service type (1%-10%)
+- **IVA Retenido**: 16% on professional services
+- **ISR Retenido**: 10% on professional services
+
+### Calculation Example
+
+```csharp
+// Invoice details
+decimal subtotal = 10000.00m;
+decimal iva = subtotal * 0.16m;           // 1,600.00
+decimal ivaRetenido = iva * 0.6667m;      // 1,066.72
+decimal isrRetenido = subtotal * 0.10m;   // 1,000.00
+
+decimal totalFactura = subtotal + iva;     // 11,600.00
+decimal totalPagar = totalFactura - ivaRetenido - isrRetenido; // 9,533.28
+
+// Insert ministracion
+MngNegocioMinistracion.Inserta_Ministracion(
+    psTipoMinistracion: "SERVICIOS",
+    psSubtotal: "10000.00",
+    psIVA: "1600.00",
+    psIvaRet: "1066.72",
+    psIsrRet: "1000.00",
+    psTotalPagar: "11600.00",
+    psTotalPagado: "9533.28",
+    // ... other parameters ...
+);
+```
+
+<Warning>
+  Withholding rates are **legally mandated** by SAT. Incorrect withholding calculations can result in tax penalties for both INAPESCA and the vendor.
+</Warning>
+
+## Payment File Generation
+
+While file generation is handled by the presentation layer, the BRL provides data:
+
+```csharp
+// Step 1: Get payment list
+List<Pagos> payments = MngNegocioPago.Comisiones_Pagar(
+    psUbicacion: "CRIP-SC",
+    psPeriodo: "2024"
+);
+
+// Step 2: Generate references
+foreach (var payment in payments)
+{
+    string referencia = MngNegocioGenerarRef.Obtiene_Max_Referencia();
+    
+    var refObject = new GenerarRef
+    {
+        Referencia = referencia,
+        Archivo = payment.Archivo,
+        TotalPagar = payment.TotalPagar,
+        FechaGeneracion = DateTime.Now.ToString("yyyy-MM-dd"),
+        Estatus = "GENERADA"
+    };
+    
+    MngNegocioGenerarRef.Inserta_Referencia(refObject);
+}
+
+// Step 3: Export to bank format (SPEI, Santander, Banamex, etc.)
+// This is handled by specialized export utilities
+```
+
+## Payment Reconciliation
+
+After bank confirms payment:
+
+```csharp
+// Update reference with payment confirmation
+MngNegocioGenerarRef.Update_UpdateReferenciaGenerada(
+    sReferencia: "20240315-0042",
+    sImportePagado: "5243.80",
+    sFechaPago: "2024-03-15"
+);
+
+// Update commission status
+MngNegocioComision.Update_estatus_Comision(
+    psEstatus: "PAGADA",
+    psArchivo: archiveId,
+    psFolio: folioId
+);
+
+// Update ministracion status
+MngNegocioMinistracion.Update_MInistracion(
+    psEstatus: "PAGADA",
+    psRefBancaria: "20240315-0042",
+    psFecha: "2024-03-15",
+    psMinistracion: ministracionId,
+    // ... other parameters ...
+);
+```
+
+## Audit Trail Integration
+
+All payment operations create audit records:
+
+- **Reference generation**: Tracks who created payment requests
+- **Status updates**: Records approval chain
+- **Payment confirmation**: Captures payment officer and timestamp
+- **Bank reconciliation**: Links reference to bank transaction ID
+
+## Security Considerations
+
+<AccordionGroup>
+  <Accordion title="Bank Account Encryption">
+    CLABE (bank account) numbers are encrypted in the database and only decrypted during payment file generation by authorized financial officers.
+  </Accordion>
+  
+  <Accordion title="Payment Authorization">
+    Payment processing requires:
+    - Budget availability confirmation
+    - Expense verification approval
+    - Financial officer authorization
+    - Director-level signature for amounts > 50,000 MXN
+  </Accordion>
+  
+  <Accordion title="Reference Number Uniqueness">
+    Reference numbers include date and sequence to prevent collisions. The system validates uniqueness before insertion.
+  </Accordion>
+  
+  <Accordion title="Tax Withholding Compliance">
+    Withholding calculations are auditable and include SAT regime codes for vendor tax compliance.
+  </Accordion>
+</AccordionGroup>
+
+## Common Payment Scenarios
+
+### Scenario 1: Standard Commission Reimbursement
+
+```csharp
+// Employee submitted expenses = 5,243.80 MXN
+// Authorized amount = 5,000.00 MXN
+// Reimbursement due = 243.80 MXN
+
+string referencia = MngNegocioGenerarRef.Obtiene_Max_Referencia();
+
+var refObject = new GenerarRef
+{
+    Referencia = referencia,
+    Archivo = archiveId,
+    TotalPagar = "243.80",
+    TipoPago = "REEMBOLSO"
+};
+
+MngNegocioGenerarRef.Inserta_Referencia(refObject);
+```
+
+### Scenario 2: Refund Processing
+
+```csharp
+// Authorized amount = 5,000.00 MXN  
+// Employee submitted = 4,200.00 MXN
+// Refund required = 800.00 MXN
+
+// Employee must return 800 MXN via deposit or payroll deduction
+string nombreReintegro = MngNegocioComprobacion.NOm_Reintegro(
+    psOficio: folioId,
+    psArchivo: archiveId
+);
+
+// Generate refund documentation
+// Refund tracked separately from payments
+```
+
+### Scenario 3: Vendor Payment with Withholdings
+
+```csharp
+MngNegocioMinistracion.Inserta_Ministracion(
+    psTipoMinistracion: "SERVICIOS",
+    psRazon: "CONSULTORES TECNICOS SA DE CV",
+    psRFC: "CTE890512XYZ",
+    psSubtotal: "15000.00",
+    psIVA: "2400.00",
+    psIvaRet: "1600.00",
+    psIsrRet: "1500.00",
+    psTotalPagar: "17400.00",
+    psTotalPagado: "14300.00",
+    psEstatus: "AUTORIZADA",
+    // ... bank details ...
+);
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Commission Management" href="./commission-management" icon="briefcase">
+    Commission creation and authorization
+  </Card>
+  <Card title="Verification Management" href="./verification-management" icon="check-circle">
+    Expense verification before payment
+  </Card>
+  <Card title="Bank Integration" href="../integrations/banking" icon="building-columns">
+    Payment file formats and bank APIs
+  </Card>
+  <Card title="Financial Reports" href="../../user-guide/reports/financial" icon="chart-line">
+    Payment tracking and reconciliation reports
+  </Card>
+</CardGroup>

@@ -1,0 +1,669 @@
+---
+title: "Commission Management (MngNegocioComision)"
+description: "Business logic for commission lifecycle, authorization workflows, and CRUD operations"
+---
+
+## Overview
+
+The `MngNegocioComision` class manages the complete lifecycle of official commissions (comisiones) in SMAF. This includes:
+
+- Commission request submission and validation
+- Multi-level authorization workflows (VoBo → Authorization)
+- Commission execution tracking and reporting
+- Integration with expense verification and payment systems
+
+**Source File**: `InapescaWeb.BRL/MngNegocioComision.cs`  
+**Author**: Juan Antonio López López (CRIP Salina Cruz)  
+**Created**: December 2015
+
+## Core CRUD Operations
+
+### Create Commission
+
+Inserts a new commission with comprehensive details:
+
+```csharp
+public static Boolean Inserta_Comision(
+    string psClv_Oficio,
+    string psTipoComision, 
+    string psFolio, 
+    string psNo_Oficio, 
+    string psFecha_Sol, 
+    string psFecharesp, 
+    string psFechaVoBo, 
+    string psFechaAut, 
+    string psUsuarioSol, 
+    string psDep, 
+    string psArea, 
+    string psProy, 
+    string psDep_Proy, 
+    string psLugar, 
+    string psTelefono, 
+    string psCapitulo, 
+    string psProceso, 
+    string psIndicador, 
+    string psPart_Presupuestal, 
+    string psFechaI, 
+    string psFechaF, 
+    string psDiasTotal, 
+    string psDiasReales, 
+    string psObjetivo, 
+    string psClaseT, 
+    string psTipoT, 
+    string psTrans_Sol, 
+    string psTransAut, 
+    string psDescAuto, 
+    string psDepTrans, 
+    string psRecorridoTerrestre, 
+    string psVueloPartNum, 
+    string psFechVueloPart, 
+    string psHorVueloPart, 
+    string psVueloRetNum, 
+    string psFechVueloRet, 
+    string psHorVueloRet, 
+    string psRecorridoAereo, 
+    string psComSol, 
+    string psComAut, 
+    string psPartCom, 
+    string psPeaje, 
+    string psPartPeaje, 
+    string psPasaje, 
+    string psPartPasaje, 
+    string psRecorridoAcuatico, 
+    string psSecEff, 
+    string psEquipo, 
+    string psObservSol, 
+    string psRespProy, 
+    string psVoBo, 
+    string psAut, 
+    string psComisionado, 
+    string psDep_Com, 
+    string psEstatus, 
+    string psObservVoBo, 
+    string psObservAut, 
+    string psEspecies, 
+    string psProductos, 
+    string psActividades,
+    string psTerritorio,
+    string psUbicacion_Aut,
+    string psPeriodo,
+    string psPais, 
+    string psEstado)
+```
+
+<ParamField path="psClv_Oficio" type="string" required>
+  Official document classification code
+</ParamField>
+
+<ParamField path="psTipoComision" type="string" required>
+  Commission type: `NACIONAL`, `INTERNACIONAL`, `EXTRAORDINARIA`
+</ParamField>
+
+<ParamField path="psFolio" type="string" required>
+  Unique commission identifier (auto-generated)
+</ParamField>
+
+<ParamField path="psFechaI / psFechaF" type="string" required>
+  Start and end dates of the commission
+</ParamField>
+
+<ParamField path="psDiasTotal" type="string" required>
+  Total calendar days (including weekends)
+</ParamField>
+
+<ParamField path="psDiasReales" type="string" required>
+  Actual working days (excludes weekends)
+</ParamField>
+
+<ParamField path="psObjetivo" type="string" required>
+  Mission objective and justification
+</ParamField>
+
+<ParamField path="psTerritorio" type="string" required>
+  Territory classification: `FRONTERIZO`, `INTERIOR`
+</ParamField>
+
+### Retrieve Commission Details
+
+Multiple methods provide commission data with varying levels of detail:
+
+#### Standard Detail Retrieval
+
+```csharp
+public static Comision Detalle_Comision(
+    string psFolio, 
+    string psDep, 
+    string psComisionado = "",
+    string psEstatus = "")
+```
+
+#### Payment View Detail
+
+```csharp
+public static Comision DetalleComision_Pagos(
+    string psFolio, 
+    string psDep, 
+    string psComisionado = "",
+    bool psUsuarioPagador = false)
+```
+
+<Info>
+  The `DetalleComision_Pagos` variant includes bank account information and payment status flags used by financial officers.
+</Info>
+
+#### Reprint View (Historical)
+
+```csharp
+public static Comision Detalle_Comision_Reimpresion(
+    string psFolio, 
+    string psDep, 
+    string psPeriodo, 
+    string psComisionado = "", 
+    string psEstatus = "")
+```
+
+### Update Commission Status
+
+Status transitions drive the authorization workflow:
+
+```csharp
+public static bool Update_estatus_Comision(
+    string psEstatus, 
+    string psUsuario = "", 
+    string psFolio = "", 
+    string psDep = "", 
+    string psArchivo = "", 
+    string psObservaciones = "", 
+    bool x = false)
+```
+
+<ResponseField name="psEstatus" type="string">
+  Target status:
+  - `REGISTRADA`: Initial submission
+  - `EN_VOBO`: Pending project manager approval
+  - `AUTORIZADA`: Authorized by supervisor
+  - `RECHAZADA`: Rejected
+  - `EFECTIVA`: Commission completed
+  - `EN_COMPROBACION`: Expense verification in progress
+  - `COMPROBADA`: Expenses verified
+  - `PAGADA`: Payment disbursed
+</ResponseField>
+
+## Authorization Workflow Methods
+
+### VoBo and Authorization Tracking
+
+Retrieve approval chain information:
+
+```csharp
+public static Entidad Vobo_Aut(
+    string psFolio, 
+    string psVobo = "", 
+    string psAut = "")
+```
+
+Returns entity with:
+- VoBo approver name and department
+- Authorization approver name and department  
+- Approval dates
+
+### Update Authorization Details
+
+Core method for processing approvals:
+
+```csharp
+public static bool Update_Comision(
+    Comision pObjeto, 
+    string psOpcion, 
+    string psFolio, 
+    string psUsuario, 
+    string psPermisos,
+    Boolean update = false)
+```
+
+<ParamField path="pObjeto" type="Comision">
+  Full commission entity with updated fields
+</ParamField>
+
+<ParamField path="psOpcion" type="string">
+  Authorization action: `VOBO`, `AUTORIZAR`, `RECHAZAR`
+</ParamField>
+
+<ParamField path="psPermisos" type="string">
+  User permission level to validate authorization rights
+</ParamField>
+
+### Commission Detail Status Updates
+
+For multi-employee commissions, update individual participant status:
+
+```csharp
+public static bool Update_Status_Comision_Detalle(
+    string psFolio, 
+    string psUbicacion, 
+    string psComisionado = "", 
+    string psOpcion = "", 
+    string psComentarios = "", 
+    string psNoOficio = "", 
+    string psAutoriza = "")
+```
+
+## Query and Filter Operations
+
+### List Commissions by User
+
+```csharp
+public static List<Comision> Regresa_ListComision(
+    string psUsuario, 
+    string psPeriodo, 
+    string psEstatus = "")
+```
+
+Returns all commissions for a user in a specific period, optionally filtered by status.
+
+### List Commissioned Employees
+
+```csharp
+public static List<Entidad> Comisionados(
+    string psFolio, 
+    string psOpcion,
+    string psUsuario,
+    string psEstatus,
+    string psTipoCom = "",
+    string psDep = "")
+```
+
+<ParamField path="psOpcion" type="string">
+  Query context:
+  - `SOLICITUD`: Include all requested participants
+  - `EFECTIVA`: Only confirmed participants
+  - `COMPROBACION`: Those submitting expenses
+</ParamField>
+
+### Advanced Filtering
+
+Comprehensive filter method for administrative views:
+
+```csharp
+public static DataSet Filtros(
+    string psPeriodo, 
+    string psInicio, 
+    string psFinal, 
+    string psFormaPago, 
+    string psEstatus, 
+    string psAdscripcion, 
+    string psUsuario)
+```
+
+Returns DataSet with multiple tables:
+1. **Commissions**: Matching commission records
+2. **Summary**: Aggregated totals by status
+3. **Centers**: Geographic distribution
+
+## Business Rule Validation
+
+### Date Overlap Detection
+
+Prevents employees from having overlapping commission dates:
+
+```csharp
+public static bool Comision_Extraordinaria(
+    string psUsuario, 
+    string psFechaInicio, 
+    string psFechaFinal, 
+    string psOpcion)
+```
+
+**Returns**: `true` if overlap detected, `false` if dates are clear
+
+<Warning>
+  This validation should be called **before** inserting a new commission to prevent scheduling conflicts.
+</Warning>
+
+### Continuous Day Accumulation
+
+Calculates accumulated consecutive travel days (SAT regulation compliance):
+
+```csharp
+public static string Obtiene_Dias_Continuos(
+    string psFechas, 
+    string psComisionado, 
+    string psTerritorio)
+```
+
+**Returns**: Number of continuous days including the proposed commission
+
+<Note>
+  Per SAT regulations, employees cannot exceed **75 continuous days** in border territory or **90 days** in interior territory without tax implications.
+</Note>
+
+### Annual Day Accumulation
+
+```csharp
+public static string Dias_Acumulados(
+    string psComisionado,
+    string psPeriodo)
+```
+
+Returns total commission days for an employee in the fiscal year.
+
+### Daily Commission Limit
+
+Check if employee already has a commission registered for the same date:
+
+```csharp
+public static string Solicitudes_Registradas(
+    string psUsuario, 
+    string psFecha)
+```
+
+## Expense Verification Integration
+
+### List Commissions Pending Verification
+
+```csharp
+public static List<comprobacion> Comision_Comp(
+    string psUsuario, 
+    string psDep)
+```
+
+Returns commissions in `EFECTIVA` status awaiting expense submission.
+
+### List Verified Commissions
+
+```csharp
+public static List<Entidad> Comision_Comporbada(
+    string psUsuario, 
+    string psDep, 
+    int tipo)
+```
+
+<ParamField path="tipo" type="int">
+  Verification type filter:
+  - `1`: Fully verified
+  - `2`: Partially verified
+  - `3`: Rejected verification
+</ParamField>
+
+### Unverified Commission Count
+
+```csharp
+public static string Comisiones_SinComprobar(
+    string psUsuario, 
+    string psPeriodo)
+```
+
+Returns count of completed commissions without expense submission.
+
+## Fiscal Compliance Methods
+
+### Tax Rate Retrieval
+
+```csharp
+public static string Obtiene_Tarifa(string psZona)
+```
+
+Returns daily travel allowance rate for zone:
+- **Zone A** (Mexico City): Higher rate
+- **Zone B** (Border cities): Border rate  
+- **Zone C** (Interior): Standard rate
+
+### Exchange Rate Lookup
+
+```csharp
+public static TipoCambio TipoCambio(
+    string psUsuario, 
+    string psFecha)
+```
+
+Retrieves official Banco de México exchange rate for international commission expense calculation.
+
+## Document Management
+
+### Generate Official Commission Letter
+
+```csharp
+public static Boolean Inserta_Oficio_Comision(
+    Comision poComision,
+    string psOficio)
+```
+
+Creates official authorization document record after commission approval.
+
+### Update Document Paths
+
+```csharp
+public static Boolean Update_ruta_Comision(
+    string psRuta, 
+    string psArchivo, 
+    string psDep, 
+    string psComisionado, 
+    string psOficio, 
+    Comision poComision)
+```
+
+Stores file system paths for generated PDF documents.
+
+### DGAIPP Document Numbering
+
+For transparency office integration:
+
+```csharp
+public static Boolean Update_Oficio_Comision_DGAIPP(
+    Comision poComision, 
+    int psNoMinDGAIPP)
+```
+
+Assigns official minute number from the transparency office (DGAIPP).
+
+## Report and Activity Tracking
+
+### Submit Commission Report
+
+```csharp
+public static Boolean Inserta_Informe_Comision(
+    string psOficio, 
+    string psUbicacionSol, 
+    string pscComisionado, 
+    string psUbicacionComisionado, 
+    string psProyecto, 
+    string psUbicacionProyect, 
+    string psSecuencia, 
+    string psInforme, 
+    string psEvidencia1, 
+    string psEvidencia2, 
+    string psEvidencia3, 
+    string psDateI, 
+    string psDateF, 
+    string psPeriodo, 
+    string psDepAut = "")
+```
+
+<ParamField path="psInforme" type="string">
+  Main report document filename
+</ParamField>
+
+<ParamField path="psEvidencia1/2/3" type="string">
+  Supporting evidence document filenames (photos, documents, etc.)
+</ParamField>
+
+### Retrieve Report Details
+
+```csharp
+public static comision_informe Obtiene_Informe(
+    string psUsuario, 
+    string psUbiaccion, 
+    string psFolio, 
+    string psDepSolicitud, 
+    string psPeriodo, 
+    string psProy = "")
+```
+
+Returns full report entity including evidence attachments.
+
+### List Report Files
+
+```csharp
+public static List<Entidad> ObtieneNombresInformes(
+    string psOficio, 
+    string psUbicacionSol, 
+    string psComisionado, 
+    string psUbicacionComisionado, 
+    string psProyect, 
+    string psUbicacionProy)
+```
+
+## Payment Processing Integration
+
+### List Commissions Pending Payment
+
+```csharp
+public static List<Comision> ListaComisionesPagar(
+    string psArchivo, 
+    string psPeriodo)
+```
+
+Returns verified commissions ready for disbursement.
+
+### Payment Detail Retrieval
+
+```csharp
+public static Comision PagoComision(
+    string psArchivo, 
+    string psPeriodo, 
+    bool psBandera = false)
+```
+
+Retrieves commission with bank account details for payment processing.
+
+## Administrative Utilities
+
+### Obtain Maximum Folio
+
+```csharp
+public static string ObtieneMaxComision(
+    string psUbicacion,
+    string psPeriodo)
+```
+
+Returns next available folio number for commission creation.
+
+### Obtain Commission Type Catalog
+
+```csharp
+public static List<Entidad> Obtiene_tipo_Comision()
+```
+
+Returns:
+- `NACIONAL`: Domestic commission
+- `INTERNACIONAL`: International commission  
+- `EXTRAORDINARIA`: Extraordinary/emergency commission
+
+### Retrieve Action Permissions
+
+```csharp
+public static List<Entidad> Obtiene_Actions(string psRol)
+```
+
+Returns allowed actions based on user role:
+- `SOLICITAR`: Submit new commissions
+- `VOBO`: Approve commissions
+- `AUTORIZAR`: Final authorization
+- `PAGAR`: Process payments
+
+## Transparency and Reporting
+
+### Public Transparency List
+
+```csharp
+public static List<Comision> Lista_ComisionesTransparencia(
+    string psYear)
+```
+
+Returns commissions for public transparency portal (filtered for public disclosure).
+
+### Budget Center Summary
+
+```csharp
+public static List<Entidad> Lista_Centros_Comisiones(
+    string psPeriodo, 
+    string psInicio, 
+    string psFinal, 
+    string psFormaPago, 
+    string psEstatus, 
+    string psAdscripcion, 
+    string psUsuario)
+```
+
+Aggregates commission spending by cost center.
+
+### Project Summary
+
+```csharp
+public static List<Entidad> Lista_Proyectos_Comisiones(
+    string psPeriodo, 
+    string psInicio, 
+    string psFinal, 
+    string psFormaPago, 
+    string psEstatus, 
+    string psAdscripcion, 
+    string psUsuario)
+```
+
+Aggregates commission spending by project code.
+
+## Example Workflow
+
+Complete commission lifecycle:
+
+```csharp
+// Step 1: Validate no date conflicts
+bool hasConflict = MngNegocioComision.Comision_Extraordinaria(
+    psUsuario: "JALP001",
+    psFechaInicio: "2024-03-15",
+    psFechaFinal: "2024-03-20",
+    psOpcion: "VALIDAR"
+);
+
+if (!hasConflict)
+{
+    // Step 2: Get next folio number
+    string folio = MngNegocioComision.ObtieneMaxComision(
+        psUbicacion: "CRIP-SC",
+        psPeriodo: "2024"
+    );
+    
+    // Step 3: Insert commission
+    bool success = MngNegocioComision.Inserta_Comision(
+        psClv_Oficio: "COM",
+        psTipoComision: "NACIONAL",
+        psFolio: folio,
+        // ... all other parameters ...
+        psEstatus: "REGISTRADA"
+    );
+    
+    // Step 4: Submit for approval
+    MngNegocioComision.Update_estatus_Comision(
+        psEstatus: "EN_VOBO",
+        psFolio: folio,
+        psUsuario: "JALP001"
+    );
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Verification Management" href="./verification-management" icon="check-circle">
+    Expense verification after commission completion
+  </Card>
+  <Card title="Payment Management" href="./payment-management" icon="money-bill">
+    Payment processing for verified commissions
+  </Card>
+  <Card title="Commission Entity" href="../entities/comision" icon="file-code">
+    Comision entity class structure
+  </Card>
+  <Card title="Commission Workflows" href="../../user-guide/commissions/workflow" icon="diagram-project">
+    User guide for commission processing
+  </Card>
+</CardGroup>

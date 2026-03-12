@@ -1,0 +1,221 @@
+---
+title: 'Entity Layer Overview'
+description: 'Understanding the entity layer architecture and design patterns in SMAF'
+---
+
+## Purpose
+
+The entity layer (`InapescaWeb.Entidades` namespace) provides Plain Old CLR Objects (POCOs) that serve as data transfer objects throughout the SMAF system. These entities represent the core business domain of expense and travel management in the Mexican Federal Public Administration.
+
+## Architecture
+
+### POCO Pattern
+
+All entity classes follow the Plain Old CLR Object (POCO) pattern:
+
+- **Simple C# classes** with no framework dependencies
+- **Private fields** with public property accessors
+- **Parameterless constructors** for easy instantiation
+- **Serializable** for data transfer and persistence
+
+```csharp
+public class Comision
+{
+    private string lsFolio;
+    private string lsFechaSol;
+    
+    public string Folio
+    {
+        get { return lsFolio; }
+        set { lsFolio = value; }
+    }
+    
+    public string Fecha_Solicitud
+    {
+        get { return lsFechaSol; }
+        set { lsFechaSol = value; }
+    }
+}
+```
+
+### Data Transfer Objects
+
+Entities function as DTOs to:
+
+- Transfer data between application layers
+- Serialize/deserialize JSON and XML for web services
+- Map to database records via data access layer
+- Bind to UI controls in web forms
+
+## Core Entity Categories
+
+### Travel Management Entities
+
+<CardGroup cols={2}>
+  <Card title="Comision" icon="plane" href="./comision">
+    Travel assignment requests with approval workflow, transportation, lodging, and budget allocation
+  </Card>
+  <Card title="Itinerario" icon="route">
+    Flight itinerary details including airlines, flight numbers, dates, and passenger information
+  </Card>
+</CardGroup>
+
+### Expense Verification Entities
+
+<CardGroup cols={2}>
+  <Card title="DatosComprobacion" icon="receipt" href="./comprobacion">
+    Comprehensive expense verification data with totals for advance and accrued expenses
+  </Card>
+  <Card title="comprobacion" icon="file-invoice">
+    Individual expense proof records with dates, concepts, amounts, and observations
+  </Card>
+</CardGroup>
+
+### User and Organization Entities
+
+<CardGroup cols={2}>
+  <Card title="Usuario" icon="user" href="./usuario">
+    User authentication, profile information, roles, and organizational assignment
+  </Card>
+  <Card title="Ubicacion" icon="building">
+    Organizational unit details including address, contact information, and hierarchy
+  </Card>
+</CardGroup>
+
+### Resource Management Entities
+
+<CardGroup cols={2}>
+  <Card title="Transporte" icon="car">
+    Vehicle and transportation resource catalog with classes, types, and availability status
+  </Card>
+  <Card title="ComisionDetalle" icon="list">
+    Detailed commission records with financial breakdowns by expense category
+  </Card>
+</CardGroup>
+
+## Field Naming Conventions
+
+### Hungarian Notation
+
+Private fields use Hungarian notation prefixes:
+
+- `ls` = Local String (e.g., `lsFolio`, `lsNombre`)
+- `pd` = Private Double (e.g., `pdTotalComprobado`)
+- `_ls` = Local String with underscore (e.g., `_lsUbicacion`)
+
+### Property Naming
+
+Public properties use descriptive Spanish names:
+
+- `Fecha_Solicitud` = Request Date
+- `Total_Viaticos` = Total Per Diem
+- `Ubicacion_Comisionado` = Assignee Location
+- `Partida_Presupuestal` = Budget Line Item
+
+## Data Types
+
+### String-Based Architecture
+
+Most properties use `string` type for flexibility:
+
+```csharp
+public string Fecha_Inicio { get; set; }  // Date as string
+public string Total_Viaticos { get; set; }  // Amount as string
+public string Dias_Total { get; set; }  // Number as string
+```
+
+<Warning>
+  String-based dates and numbers require validation and conversion in the business logic layer.
+</Warning>
+
+### Numeric Properties
+
+Financial calculations use `double` for precision:
+
+```csharp
+public double TotalComprobado { get; set; }
+public double TotalViaticosAnt { get; set; }
+public double GranTotal { get; set; }
+```
+
+## Initialization Patterns
+
+### Default Constructors
+
+Entities initialize fields to safe default values:
+
+```csharp
+public Usuario()
+{
+    lsUsuario = string.Empty;
+    lsPassword = string.Empty;
+    lsNivel = string.Empty;
+    lsRFC = string.Empty;
+}
+```
+
+### Numeric Initialization
+
+Financial entities initialize numeric fields to zero:
+
+```csharp
+public DatosComprobacion()
+{
+    pdTotalComprobado = 0;
+    pdTotalViaticosAnt = 0;
+    pdGranTotal = 0;
+}
+```
+
+## Serialization Support
+
+### JSON Serialization
+
+Entities serialize cleanly to JSON for REST APIs:
+
+```json
+{
+  "Folio": "2024-001",
+  "Fecha_Solicitud": "2024-03-15",
+  "Usuario_Solicita": "juan.lopez",
+  "Total_Viaticos": "5000.00"
+}
+```
+
+### XML Support
+
+Specialized entities like `cfdv33`, `cfdv4`, `cfdiv33`, and `cfdiv4` handle CFDI (Comprobante Fiscal Digital por Internet) XML invoice formats mandated by Mexican tax regulations.
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Data Access Layer" icon="database" href="../data-access/overview">
+    How entities map to database operations
+  </Card>
+  <Card title="Business Logic Layer" icon="gears" href="../business-logic/overview">
+    Entity validation and business rules
+  </Card>
+  <Card title="API Layer" icon="code" href="../api/overview">
+    Entity serialization in web services
+  </Card>
+  <Card title="Database Schema" icon="table" href="../database/schema">
+    Entity-to-table mappings
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always initialize entities">
+    Use parameterless constructors to ensure fields have safe default values
+  </Step>
+  <Step title="Validate before persistence">
+    Check required fields and data formats in the business logic layer
+  </Step>
+  <Step title="Convert data types carefully">
+    When converting string dates/numbers, handle parsing errors gracefully
+  </Step>
+  <Step title="Document Spanish terminology">
+    Include comments explaining business domain terms for non-Spanish speakers
+  </Step>
+</Steps>

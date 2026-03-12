@@ -1,0 +1,583 @@
+---
+title: 'Reportes de Viáticos'
+description: 'Generación de reportes detallados de gastos de viaje con filtros avanzados y análisis de comprobación'
+icon: 'file-invoice-dollar'
+---
+
+## Descripción General
+
+El módulo de Reportes de Viáticos permite generar informes detallados sobre comisiones, incluyendo montos autorizados, comprobaciones y reintegros. Soporta múltiples niveles de detalle y formatos de exportación.
+
+## Acceso al Módulo
+
+Navegue a **Reportes > Reporte de Viáticos** desde el menú principal.
+
+<Frame>
+  <img src="/images/reportes-viaticos-filtros.png" alt="Filtros de Reporte de Viáticos" />
+</Frame>
+
+## Filtros de Búsqueda
+
+### Filtros Básicos
+
+<Steps>
+  <Step title="Tipo de Comisión">
+    Seleccione el ámbito de la comisión:
+    
+    - **Nacional**: Comisiones dentro del territorio mexicano
+    - **Internacional**: Comisiones al extranjero
+    - **Todas**: Incluir ambos tipos
+    
+    ```csharp
+    dplTipoCom.Items.Add(new ListItem(" = S E L E C C I O N E = ", "0"));
+    dplTipoCom.Items.Add(new ListItem("N A C I O N A L", "2"));
+    dplTipoCom.Items.Add(new ListItem("I N T E R N A C I O N A L", "3"));
+    ```
+  </Step>
+  
+  <Step title="Período Fiscal">
+    Seleccione el año fiscal para el reporte:
+    
+    ```csharp
+    dplAnio.DataSource = MngNegocioAnio.ObtieneAnios();
+    dplAnio.DataTextField = Dictionary.DESCRIPCION;
+    dplAnio.DataValueField = Dictionary.CODIGO;
+    dplAnio.DataBind();
+    ```
+    
+    Si no especifica fechas, el sistema utilizará el rango completo del año fiscal.
+  </Step>
+  
+  <Step title="Rango de Fechas">
+    Defina el período específico de las comisiones:
+    
+    ```aspx
+    <asp:TextBox ID="txtInicio" runat="server" Width="50%"></asp:TextBox>
+    <cc1:CalendarExtender ID="txtInicio_CalendarExtender" runat="server"
+        BehaviorID="txtInicio_CalendarExtender" 
+        TargetControlID="txtInicio" 
+        Format="yyyy-MM-dd" />
+    ```
+    
+    <Note>
+    Las fechas se refieren al período de comisión, no a la fecha de autorización.
+    </Note>
+  </Step>
+</Steps>
+
+### Filtros Avanzados
+
+<Tabs>
+  <Tab title="Tipo de Viáticos">
+    Filtre por forma de pago:
+    
+    ```csharp
+    dplTipoViaticos.DataSource = MngNegocioViaticos.Metodo_Viaticos(true);
+    dplTipoViaticos.DataTextField = Dictionary.DESCRIPCION;
+    dplTipoViaticos.DataValueField = Dictionary.CODIGO;
+    dplTipoViaticos.DataBind();
+    ```
+    
+    **Opciones disponibles:**
+    - **Anticipados**: Viáticos entregados antes de la comisión
+    - **Devengados**: Viáticos pagados después de la comisión
+    - **Todos**: Ambos tipos
+  </Tab>
+  
+  <Tab title="Estatus de Comprobación">
+    Filtre por estado de comprobación de gastos:
+    
+    ```csharp
+    dplEstatusComp.DataSource = MngNegocioComision.ObtieneTipoComprobacion();
+    dplEstatusComp.DataTextField = Dictionary.DESCRIPCION;
+    dplEstatusComp.DataValueField = Dictionary.CODIGO;
+    dplEstatusComp.DataBind();
+    ```
+    
+    **Estados:**
+    - **No Comprobada** (código 9)
+    - **Comprobada** (código 7)
+    - **Sin Viáticos** (código 5)
+    - **Todas**
+    
+    **Mapeo de códigos:**
+    ```csharp
+    if (lsEstatusComprobacion == "1")
+    {
+        lsEstatusComprobacion = "'9'";  // No Comprobada
+    }
+    else if (lsEstatusComprobacion == "2")
+    {
+        lsEstatusComprobacion = "'7'";  // Comprobada
+    }
+    else if (lsEstatusComprobacion == "3")
+    {
+        lsEstatusComprobacion = "'5'";  // Sin viaticos
+    }
+    else if (lsEstatusComprobacion == "4")
+    {
+        lsEstatusComprobacion = "'7','9','5'";  // Todas
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Por Adscripción">
+    Filtre por centro de investigación (disponible solo para Director de Administración):
+    
+    ```csharp
+    if (Session["Crip_Rol"].ToString() == Dictionary.DIRECTOR_ADMINISTRACION)
+    {
+        dplAdscripcion.DataSource = MngNegocioAdscripcion.ObtieneAdscripcion();
+        dplAdscripcion.DataTextField = Dictionary.DESCRIPCION;
+        dplAdscripcion.DataValueField = Dictionary.CODIGO;
+        dplAdscripcion.DataBind();
+        CheckBox1.Visible = true;  // Resumen Ejecutivo
+    }
+    else
+    {
+        // Restringido a su centro
+        lsAdscripcion = Session["Crip_Ubicacion"].ToString();
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Por Usuario">
+    Filtre por comisionado específico:
+    
+    ```csharp
+    protected void dplAdscripcion_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        lsAdscripcion = dplAdscripcion.SelectedValue.ToString();
+        
+        if (lsAdscripcion != string.Empty)
+        {
+            dplUsuarios.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+                lsAdscripcion, 
+                Session["Crip_Usuario"].ToString(), 
+                "", 
+                true
+            );
+            dplUsuarios.DataTextField = Dictionary.DESCRIPCION;
+            dplUsuarios.DataValueField = Dictionary.CODIGO;
+            dplUsuarios.DataBind();
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Tipos de Reportes
+
+### Reporte Detallado (Estándar)
+
+Incluye información completa de cada comisión con montos autorizados y comprobados.
+
+#### Estructura de Datos
+
+```csharp
+DataTable tableFinal = new DataTable("DataSetArbol");
+
+tableFinal.Columns.Add("OFICIO", typeof(String));
+tableFinal.Columns.Add("ARCHIVO", typeof(String));
+tableFinal.Columns.Add("COMISIONADO", typeof(String));
+tableFinal.Columns.Add("LUGAR", typeof(String));
+tableFinal.Columns.Add("FECHAS", typeof(String));
+
+// Montos Otorgados
+tableFinal.Columns.Add("PASAJES_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("PEAJES_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("COMBUSTIBLE_OTORGADO", typeof(Double));
+tableFinal.Columns.Add("VIATICOS_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("SINGLADURAS_OTORGADAS", typeof(Double));
+tableFinal.Columns.Add("TOTAL_OTORGADOS", typeof(Double));
+
+// Montos Comprobados
+tableFinal.Columns.Add("PASAJES_COMPROBADOS", typeof(Double));
+tableFinal.Columns.Add("PEAJES_COMPROBADOS", typeof(Double));
+tableFinal.Columns.Add("COMBUSTIBLE_COMPROBADO", typeof(Double));
+tableFinal.Columns.Add("VIATICOS_COMPROBADOS", typeof(Double));
+tableFinal.Columns.Add("SINGLADURAS_COMPROBADAS", typeof(Double));
+tableFinal.Columns.Add(" NO FISCALES ", typeof(Double));
+tableFinal.Columns.Add("TOTAL_COMPROBADO", typeof(Double));
+tableFinal.Columns.Add("REINTEGRO", typeof(Double));
+
+tableFinal.Columns.Add("ESTATUS", typeof(String));
+tableFinal.Columns.Add("TIPO COMISION", typeof(String));
+```
+
+#### Cálculo de Comprobaciones
+
+```csharp
+foreach (DataRow r in workTable.Rows)
+{
+    DataRow workRow = tableFinal.NewRow();
+    
+    // Datos básicos
+    workRow[0] = r[0].ToString();  // OFICIO
+    workRow[1] = r[1].ToString();  // ARCHIVO
+    workRow[2] = MngNegocioUsuarios.Obtiene_Nombre(r[2].ToString());  // COMISIONADO
+    workRow[3] = r[3].ToString();  // LUGAR
+    workRow[4] = r[4].ToString();  // FECHAS
+    
+    // Montos otorgados (convertir a double)
+    workRow[5] = clsFuncionesGral.Convert_Double(
+        clsFuncionesGral.Convert_Decimales(r[5].ToString().Trim())
+    );  // PASAJES
+    workRow[6] = clsFuncionesGral.Convert_Double(
+        clsFuncionesGral.Convert_Decimales(r[6].ToString().Trim())
+    );  // PEAJES
+    workRow[7] = clsFuncionesGral.Convert_Double(
+        clsFuncionesGral.Convert_Decimales(r[7].ToString().Trim())
+    );  // COMBUSTIBLE
+    workRow[8] = clsFuncionesGral.Convert_Double(
+        clsFuncionesGral.Convert_Decimales(r[8].ToString().Trim())
+    );  // VIATICOS
+    workRow[9] = clsFuncionesGral.Convert_Double(
+        clsFuncionesGral.Convert_Decimales(r[9].ToString().Trim())
+    );  // SINGLADURAS
+    
+    // Total otorgado (suma de conceptos)
+    workRow[10] = 
+        clsFuncionesGral.Convert_Double(workRow[5].ToString()) +
+        clsFuncionesGral.Convert_Double(workRow[6].ToString()) +
+        clsFuncionesGral.Convert_Double(workRow[7].ToString()) +
+        clsFuncionesGral.Convert_Double(workRow[8].ToString()) +
+        clsFuncionesGral.Convert_Double(workRow[9].ToString());
+    
+    // Montos comprobados (por concepto)
+    workRow[11] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(),  // Usuario
+        r[10].ToString().Trim(), // Periodo
+        "8",                     // Código: Pasajes
+        r[0].ToString().Trim(),  // Oficio
+        r[1].ToString().Trim()   // Archivo
+    );
+    
+    workRow[12] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "7", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );  // PEAJES
+    
+    workRow[13] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "6", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );  // COMBUSTIBLE
+    
+    workRow[14] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "0", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );  // VIATICOS
+    
+    workRow[15] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "18", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );  // SINGLADURAS
+    
+    workRow[16] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "12", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );  // NO FISCALES
+    
+    // Total comprobado (sin reintegro)
+    workRow[17] = clsFuncionesGral.Convert_Decimales(
+        (clsFuncionesGral.Convert_Double(MngNegocioComprobacion.Totales(
+            r[10].ToString().Trim(), 
+            r[2].ToString().Trim(), 
+            r[1].ToString().Trim(), 
+            "0"
+        )) - clsFuncionesGral.Convert_Double(MngNegocioComprobacion.Sum_Importe(
+            r[2].ToString().Trim(), 
+            r[10].ToString().Trim(), 
+            "13", 
+            r[0].ToString().Trim(), 
+            r[1].ToString().Trim()
+        ))).ToString()
+    );
+    
+    // Reintegro
+    workRow[18] = MngNegocioComprobacion.Sum_Importe(
+        r[2].ToString().Trim(), r[10].ToString().Trim(), "13", 
+        r[0].ToString().Trim(), r[1].ToString().Trim()
+    );
+    
+    // Estatus de comprobación
+    if (r[11].ToString() == "9")
+        workRow[19] = "No Comprobada";
+    else if (r[11].ToString() == "7")
+        workRow[19] = "comprobada";
+    else if (r[11].ToString() == "5")
+        workRow[19] = "Sin viaticos";
+    
+    // Tipo de comisión
+    if (r[12].ToString() == "2")
+        workRow[20] = " NACIONAL";
+    else
+        workRow[20] = " INTERNACIONAL";
+    
+    tableFinal.Rows.Add(workRow);
+}
+```
+
+### Resumen Ejecutivo
+
+Disponible solo para Directores de Administración. Agrupa gastos por centro de investigación.
+
+```csharp
+if (CheckBox1.Checked)
+{
+    List<Entidad> ListaCentrosComisiones = MngNegocioComision.Lista_Centros_Comisiones(
+        lsAnio, lsInicio, lsFinal, lsTipoViaticos, 
+        lsEstatusComprobacion, lsAdscripcion, lsUsuarioAdscripcion
+    );
+    
+    DataTable tableFinal = new DataTable("DataSetArbol");
+    tableFinal.Columns.Add("CENTRO DE COSTO", typeof(String));
+    tableFinal.Columns.Add("PASAJES COMPROBADOS", typeof(String));
+    tableFinal.Columns.Add("PEAJES COMPROBADOS", typeof(String));
+    tableFinal.Columns.Add("COMBUSTIBLE EN EFECTIVO COMPROBADO", typeof(String));
+    tableFinal.Columns.Add("SINGADURAS COMPROBADAS", typeof(String));
+    tableFinal.Columns.Add("CERTIFICADOS DE TRANSITO COMPROBADOS", typeof(String));
+    tableFinal.Columns.Add("NO FISCALES", typeof(String));
+    tableFinal.Columns.Add("VIATICOS COMPROBADOS", typeof(String));
+    tableFinal.Columns.Add("REINTEGRO REALIZADO", typeof(String));
+    
+    foreach (Entidad r in ListaCentrosComisiones)
+    {
+        DataRow workRow = tableFinal.NewRow();
+        workRow[0] = clsFuncionesGral.ConvertMayus(r.Descripcion);
+        
+        // Suma de comprobaciones por concepto
+        workRow[1] = MngNegocioComprobacion.Sum_Totales("'8'", lsAnio, r.Codigo);
+        workRow[2] = MngNegocioComprobacion.Sum_Totales("'7','16'", lsAnio, r.Codigo);
+        workRow[3] = MngNegocioComprobacion.Sum_Totales("'6'", lsAnio, r.Codigo);
+        workRow[4] = MngNegocioComprobacion.Sum_Totales("'19'", lsAnio, r.Codigo);
+        workRow[5] = MngNegocioComprobacion.Sum_Totales("'18'", lsAnio, r.Codigo);
+        workRow[6] = MngNegocioComprobacion.Sum_Totales("'12'", lsAnio, r.Codigo);
+        workRow[7] = MngNegocioComprobacion.Sum_Totales(
+            "'5','9','11','14','15','17','20'", lsAnio, r.Codigo
+        );
+        workRow[8] = MngNegocioComprobacion.Sum_Totales("'13'", lsAnio, r.Codigo);
+        
+        tableFinal.Rows.Add(workRow);
+    }
+}
+```
+
+### Resumen de Auditoría
+
+Incluye información adicional requerida para auditorías (CURP, RFC, número de empleado, partida presupuestal).
+
+```csharp
+if (chkAuditoria.Checked)
+{
+    tableFinal.Columns.Add("OFICIO", typeof(String));
+    tableFinal.Columns.Add("ARCHIVO", typeof(String));
+    tableFinal.Columns.Add("AMPLIACION", typeof(String));
+    tableFinal.Columns.Add("COMISIONADO", typeof(String));
+    tableFinal.Columns.Add("NIVEL", typeof(String));
+    tableFinal.Columns.Add("PUESTO", typeof(String));
+    // ... más campos ...
+    tableFinal.Columns.Add("CURP", typeof(String));
+    tableFinal.Columns.Add("RFC", typeof(String));
+    tableFinal.Columns.Add("NUM_EMPLEADO", typeof(String));
+    tableFinal.Columns.Add("UBICACION_PROYECTO", typeof(String));
+    tableFinal.Columns.Add("PROYECTO", typeof(String));
+    
+    foreach (DataRow r in workTable.Rows)
+    {
+        Usuario usu = MngNegocioUsuarios.DatosComisionado1(
+            r[3].ToString().Trim(), lsAnio
+        );
+        
+        workRow[26] = usu.CURP;
+        workRow[27] = usu.RFC;
+        workRow[28] = usu.NUM_EMP;
+        workRow[29] = MngNegocioDependencia.Centro_Descrip(r[16].ToString());
+        workRow[30] = MngNegocioProyecto.Nombre_Proyecto(
+            r[17].ToString(), r[16].ToString(), lsAnio
+        );
+    }
+}
+```
+
+## Códigos de Concepto
+
+<Note>
+El sistema utiliza códigos numéricos para identificar conceptos de gasto:
+</Note>
+
+| Código | Concepto | Descripción |
+|--------|----------|-------------|
+| **0** | Viáticos | Alimentación y hospedaje |
+| **5** | Viáticos zona 1 | |
+| **6** | Combustible | Gasolina en efectivo |
+| **7** | Peajes | Casetas de autopista |
+| **8** | Pasajes | Boletos aéreos o terrestres |
+| **9** | Viáticos zona 2 | |
+| **11** | Viáticos zona 3 | |
+| **12** | No Fiscales | Gastos sin factura |
+| **13** | Reintegro | Devolución de recursos |
+| **14** | Viáticos zona 4 | |
+| **15** | Viáticos zona 5 | |
+| **16** | Certificados de Tránsito | |
+| **17** | Viáticos zona 6 | |
+| **18** | Singladuras | Viáticos marítimos |
+| **19** | Certificados de Tránsito (alterno) | |
+| **20** | Viáticos zona 7 | |
+
+## Exportación a Excel
+
+### Proceso de Generación
+
+<Steps>
+  <Step title="Nombre del Archivo">
+    El usuario debe proporcionar un nombre para el archivo:
+    
+    ```csharp
+    if ((txtNombre.Text == "") | (txtNombre.Text == null) | (txtNombre.Text == string.Empty))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('Nombre de archivo forzoso');", 
+            true
+        );
+        return;
+    }
+    ```
+  </Step>
+  
+  <Step title="Verificación y Limpieza">
+    El sistema verifica y elimina archivos existentes:
+    
+    ```csharp
+    string raiz = HttpContext.Current.Server.MapPath("..") + "\\Reportes\\Excel";
+    
+    if (File.Exists(raiz + "/" + txtNombre.Text + ".xls"))
+    {
+        File.Delete(raiz + "/" + txtNombre.Text + ".xls");
+    }
+    ```
+  </Step>
+  
+  <Step title="Generación del Archivo">
+    El sistema genera el archivo Excel con formato TSV:
+    
+    ```csharp
+    const string FIELDSEPARATOR = "\t";
+    const string ROWSEPARATOR = "\n";
+    StringBuilder output = new StringBuilder();
+    
+    // Escribir encabezados
+    foreach (DataColumn dc in tableFinal.Columns)
+    {
+        output.Append(dc.ColumnName);
+        output.Append(FIELDSEPARATOR);
+    }
+    output.Append(ROWSEPARATOR);
+    
+    // Escribir registros
+    foreach (DataRow item in tableFinal.Rows)
+    {
+        foreach (object value in item.ItemArray)
+        {
+            // Limpiar saltos de línea
+            output.Append(value.ToString().Replace('\n', ' ').Replace('\r', ' '));
+            output.Append(FIELDSEPARATOR);
+        }
+        output.Append(ROWSEPARATOR);
+    }
+    
+    // Guardar archivo
+    raiz = HttpContext.Current.Server.MapPath("..") + 
+           "\\Reportes\\Excel\\" + txtNombre.Text + ".xls";
+    
+    StreamWriter sw = new StreamWriter(raiz);
+    sw.Write(output.ToString());
+    sw.Close();
+    ```
+  </Step>
+  
+  <Step title="Descarga">
+    El archivo se descarga automáticamente:
+    
+    ```csharp
+    raiz = HttpContext.Current.Server.MapPath("..") + "\\Reportes\\Excel";
+    clsPdf.DonwloadFile(raiz, txtNombre.Text + ".xls");
+    ```
+  </Step>
+</Steps>
+
+## Lógica de Fechas
+
+El sistema maneja inteligentemente los rangos de fechas:
+
+```csharp
+if (((txtInicio.Text == "") | (txtInicio.Text == null)) & 
+    ((txtFin.Text == "") | (txtFin.Text == null)))
+{
+    // Sin fechas: usar año fiscal completo
+    Entidad Inicio_Final = MngNegocioAnio.Inicio_Final(lsAnio);
+    lsInicio = clsFuncionesGral.FormatFecha(Inicio_Final.Codigo);
+    lsFinal = clsFuncionesGral.FormatFecha(Inicio_Final.Descripcion);
+}
+else if (((txtInicio.Text != "") | (txtInicio.Text != null)) & 
+         ((txtFin.Text == "") | (txtFin.Text == null)))
+{
+    // Solo fecha inicio: hasta hoy
+    lsInicio = txtInicio.Text;
+    lsFinal = clsFuncionesGral.FormatFecha(lsHoy);
+}
+else if (((txtInicio.Text == "") | (txtInicio.Text == null)) & 
+         ((txtFin.Text != "") | (txtFin.Text != null)))
+{
+    // Solo fecha fin: desde inicio del año
+    lsInicio = MngNegocioAnio.Anio(lsAnio);
+    lsFinal = txtFin.Text;
+}
+else
+{
+    // Ambas fechas especificadas
+    lsInicio = txtInicio.Text;
+    lsFinal = txtFin.Text;
+}
+```
+
+## Mejores Prácticas
+
+<AccordionGroup>
+  <Accordion title="Rendimiento">
+    - Para reportes grandes (>1000 comisiones), considere filtrar por mes o centro específico
+    - El resumen ejecutivo es más rápido que el reporte detallado
+    - Evite generar múltiples reportes simultáneamente
+  </Accordion>
+  
+  <Accordion title="Nomenclatura de Archivos">
+    - Use nombres descriptivos: `Viaticos_Enero_2024_CRIPMAZ`
+    - Incluya fecha y centro de investigación
+    - Evite caracteres especiales (use solo letras, números y guiones)
+  </Accordion>
+  
+  <Accordion title="Validación de Datos">
+    - Verifique que todas las comisiones estén comprobadas antes de generar reportes finales
+    - Compare el total otorgado vs. comprobado para detectar inconsistencias
+    - Revise los reintegros pendientes
+  </Accordion>
+</AccordionGroup>
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Reportes de Transparencia" icon="eye" href="./transparency-reports">
+    Configure reportes regulatorios para transparencia
+  </Card>
+  <Card title="Reportes Financieros" icon="chart-line" href="./financial-reports">
+    Analice consumo presupuestal por programa
+  </Card>
+  <Card title="Comprobación" icon="receipt" href="../comprobacion/overview">
+    Aprenda a comprobar gastos de viaje
+  </Card>
+  <Card title="Proyectos" icon="folder-open" href="../proyectos/overview">
+    Gestione proyectos y presupuestos
+  </Card>
+</CardGroup>

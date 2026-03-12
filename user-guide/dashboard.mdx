@@ -1,0 +1,315 @@
+---
+title: 'Dashboard'
+description: 'Navigate your SMAF home page and access key features and modules'
+icon: 'gauge-high'
+---
+
+# Dashboard Overview
+
+The SMAF Dashboard (Home page) is your central hub for managing expense and travel allowances. After successful authentication, you'll be greeted with a personalized interface showing your user information and available modules.
+
+## Page Layout
+
+The dashboard is divided into three main sections:
+
+### Header Section
+
+Displays the INAPESCA branding and application title:
+
+- **Logo**: INAPESCA official logo (700px × 65px)
+- **Title**: "INAPESCA - WEB - Aplicativo de Control Interno de Viáticos"
+
+### Navigation Menu (Left Panel)
+
+A dynamic TreeView menu that displays modules based on your user role. This menu is generated server-side using:
+
+```csharp Home.aspx.cs
+clsFuncionesGral.LlenarTreeViews(
+    Dictionary.NUMERO_CERO, 
+    tvMenu, 
+    false, 
+    "Menu", 
+    "SMAF", 
+    Session["Crip_Rol"].ToString()
+);
+```
+
+<Note>
+  The menu structure is role-based. You'll only see modules and features that your role has permission to access.
+</Note>
+
+### User Profile Panel (Right Panel)
+
+Displays your comprehensive user information in a structured table format.
+
+## User Profile Information
+
+The dashboard welcomes you by name and displays detailed information about your account:
+
+### Welcome Message
+
+```csharp Home.aspx.cs
+lblBienvenido.Text = "Bienvenido";
+```
+
+A personalized greeting appears at the top of your profile panel.
+
+### Personal Information
+
+The following information is displayed in a formatted table:
+
+| Field | Description | Source |
+|-------|-------------|--------|
+| **Ubicación/Adscripción** | Your office location with full address and phone | `MngNegocioAdscripcion.ObtieneDatosUbicacion()` |
+| **RFC** | Your tax identification number | Session["Crip_RFC"] |
+| **Nombre** | Your full name (First + Paternal + Maternal) | Session["Crip_Nombre"] + Session["Crip_ApPat"] + Session["Crip_ApMat"] |
+| **Cargo** | Your position/role | Session["Crip_Cargo"] |
+| **Clave Puesto** | Your position code (Level + Plaza) | Session["Crip_Nivel"] + Session["Crip_Plaza"] |
+| **Nombre Puesto** | Your job title | Session["Crip_Puesto"] |
+
+### Code Implementation
+
+```csharp Home.aspx.cs
+public void Carga_Controles()
+{
+    Label1.Text = clsFuncionesGral.ConvertMayus(Dictionary.UBICACION_ADSCRIPCION + DP);
+    Label2.Text = clsFuncionesGral.ConvertMayus(Dictionary.RFC + DP);
+    Label3.Text = clsFuncionesGral.ConvertMayus(Dictionary.NOMBRE + DP);
+    Label4.Text = clsFuncionesGral.ConvertMayus(Dictionary.CARGO + DP);
+    Label5.Text = clsFuncionesGral.ConvertMayus(Dictionary.CLAVE_PUESTO + DP);
+    Label6.Text = clsFuncionesGral.ConvertMayus(Dictionary.NOMBRE_PUESTO + DP);
+
+    lblBienvenido.Text = "Bienvenido";
+    lblRFC.Text = Session["Crip_RFC"].ToString();
+    lblNombre.Text = Session["Crip_Nombre"].ToString() + " " + 
+                     Session["Crip_ApPat"].ToString() + " " + 
+                     Session["Crip_ApMat"].ToString();
+    lblCargo.Text = Session["Crip_Cargo"].ToString();
+    lblCvlPuesto.Text = Session["Crip_Nivel"].ToString() + " " + 
+                        Session["Crip_Plaza"].ToString();
+    lblNomPuesto.Text = Session["Crip_Puesto"].ToString();
+    
+    Ubicacion oUbicacion = MngNegocioAdscripcion.ObtieneDatosUbicacion(
+        Session["Crip_Ubicacion"].ToString()
+    );
+    lblUbicacion.Text = oUbicacion.Descripcion + "," + 
+                        oUbicacion.Estado + ".<br> Tel: " + 
+                        oUbicacion.Telefono;
+}
+```
+
+<Tip>
+  All labels are automatically converted to uppercase using `ConvertMayus()` for consistent formatting.
+</Tip>
+
+## Quick Access Features
+
+### Modify Personal Data
+
+At the bottom of the user profile panel, you'll find a link to update your personal information:
+
+```csharp Home.aspx.cs
+lnkDatosPersonales.Text = "Modificar Datos Personales.";
+```
+
+Clicking this link redirects you to the personal data update page:
+
+```csharp Home.aspx.cs
+protected void lnkDatosPersonales_Click(object sender, EventArgs e)
+{
+    Response.Redirect("../Catalogos/Actualiza_Datos.aspx", true);
+}
+```
+
+<Warning>
+  Ensure all personal information is accurate and up-to-date, as it's used in expense reports and official documentation.
+</Warning>
+
+## Available Modules
+
+The dashboard provides access to various modules through the TreeView menu. The modules you see depend on your assigned role.
+
+### Module Navigation
+
+When you click on a menu item, the system:
+
+1. **Captures the selection**:
+```csharp Home.aspx.cs
+protected void tvMenu_SelectedNodeChanged(object sender, EventArgs e)
+{
+    string lsModulo = Convert.ToString(tvMenu.SelectedNode.Value);
+    string lsRol = Session["Crip_Rol"].ToString();
+    
+    WebPage objWebPage = MngNegocioMenu.MngNegocioURL(lsModulo, lsRol);
+}
+```
+
+2. **Validates access**: Checks if your role has permission to access the selected module
+
+3. **Redirects to module**: Navigates to the appropriate page based on the URL stored in the database
+
+```csharp Home.aspx.cs
+if (objWebPage != null)
+{
+    if (objWebPage.URL != string.Empty)
+    {
+        if (objWebPage.Padre != "0")
+        {
+            Response.Redirect(objWebPage.URL, true);
+        }
+        if (objWebPage.Modulo == "99")
+        {
+            Response.Redirect(objWebPage.URL, true);
+        }
+    }
+}
+```
+
+### Role-Based Menu
+
+The menu structure is dynamically generated based on your role identifier stored in `Session["Crip_Rol"]`:
+
+```csharp clsFuncionesGral.cs
+public static void LlenarTreeViews(
+    string psPadre, 
+    TreeView ptvObject, 
+    Boolean psBandera, 
+    string psTipo, 
+    string psAplicativo, 
+    string psRol = "", 
+    string psUbicacion = ""
+)
+{
+    switch (psAplicativo)
+    {
+        case "SMAF":
+            switch (psTipo)
+            {
+                case "Menu":
+                    datasetArbol = MngNegocioMenu.MngDatosMenu(psRol, psPadre);
+                    tblTabla = datasetArbol.Tables["DataSetArbol"];
+                    break;
+            }
+            break;
+    }
+    
+    // Build TreeView from dataset
+    foreach (DataRow lRegistro in tblTabla.Rows)
+    {
+        lsPadre = Convert.ToString(lRegistro["PADRE"]);
+        lsModulo = Convert.ToString(lRegistro["MODULO"]);
+        lsDescripcion = Convert.ToString(lRegistro["DESCRIPCION"]);
+        
+        objTreeview.ContruirMenu(
+            lsModulo, 
+            lsDescripcion, 
+            ptvObject, 
+            lbBandera, 
+            psRol, 
+            psTipo, 
+            psAplicativo
+        );
+    }
+}
+```
+
+<Note>
+  The menu hierarchy is retrieved from the database and organized by parent-child relationships, creating an expandable tree structure.
+</Note>
+
+## Session Management
+
+The dashboard includes automatic session validation on every page load:
+
+```csharp Home.aspx.cs
+protected void Page_Load(object sender, EventArgs e)
+{
+    if (!clsFuncionesGral.IsSessionTimedOut())
+    {
+        Response.Cache.SetCacheability(HttpCacheability.NoCache);
+        
+        if (!IsPostBack)
+        {
+            Carga_Controles();
+            clsFuncionesGral.LlenarTreeViews(
+                Dictionary.NUMERO_CERO, 
+                tvMenu, 
+                false, 
+                "Menu", 
+                "SMAF", 
+                Session["Crip_Rol"].ToString()
+            );
+        }
+    }
+    else
+    {
+        Response.Redirect("../Index.aspx", true);
+    }
+}
+```
+
+### Cache Control
+
+The dashboard disables browser caching to ensure sensitive data is not stored:
+
+```csharp
+Response.Cache.SetCacheability(HttpCacheability.NoCache);
+```
+
+## Visual Design
+
+The dashboard uses a clean, professional layout:
+
+- **Left panel**: TreeView navigation menu with collapsible sections
+- **Right panel**: User profile information in alternating row colors
+  - Even rows: `#E0F2F5` (light blue background)
+  - Odd rows: White background
+- **Header**: Blue background (`#5c87b2`) for the welcome message
+
+```html Home.aspx
+<div id="side-a">
+    <asp:TreeView ID="tvMenu" runat="server" 
+                  ShowCheckBoxes="None" 
+                  ShowLines="false" 
+                  onselectednodechanged="tvMenu_SelectedNodeChanged">
+    </asp:TreeView>
+</div>
+
+<div id="side-b">
+    <table id="tbl_Datos" border="0">
+        <tr>
+            <td colspan="2" style="background-color:#5c87b2;">
+                <h1><asp:Label ID="lblBienvenido" runat="server"></asp:Label></h1>
+            </td>
+        </tr>
+        <!-- User information rows -->
+    </table>
+</div>
+```
+
+## Dashboard Features Summary
+
+<CardGroup cols={2}>
+  <Card title="Personalized Welcome" icon="user">
+    Displays your name, position, and office location
+  </Card>
+  
+  <Card title="Role-Based Menu" icon="sitemap">
+    Dynamic menu showing only modules you have access to
+  </Card>
+  
+  <Card title="Quick Profile Update" icon="pen-to-square">
+    Direct link to modify your personal information
+  </Card>
+  
+  <Card title="Session Security" icon="shield">
+    Automatic session validation and timeout protection
+  </Card>
+</CardGroup>
+
+## Source Code References
+
+- **Dashboard Page**: `Home/Home.aspx` and `Home/Home.aspx.cs`
+- **Menu Generation**: `clsFuncionesGral.cs:739-814`
+- **Session Validation**: `clsFuncionesGral.cs:42-70`
+- **Navigation Logic**: `Home.aspx.cs:110-144`

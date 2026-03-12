@@ -1,0 +1,668 @@
+---
+title: "Verification Management (MngNegocioComprobacion)"
+description: "Expense verification, CFDI invoice validation, and reimbursement calculation logic"
+---
+
+## Overview
+
+The `MngNegocioComprobacion` class handles all business logic related to expense verification (comprobación) after commission completion. This includes:
+
+- CFDI invoice validation and XML processing
+- Non-fiscal expense documentation (tickets, receipts)
+- Allowance vs. actual expense calculations
+- Reimbursement and refund determination
+- Budget compliance verification
+
+**Source File**: `InapescaWeb.BRL/MngNegocioComprobacion.cs`  
+**Author**: Juan Antonio López López (CRIP Salina Cruz)  
+**Created**: November 2015
+
+## Core Verification Operations
+
+### List Expense Verifications
+
+Retrieve all expense submissions for a commission:
+
+```csharp
+public static List<Comisio_Comprobacion> Regresa_ListComprobacion(
+    string psUbicacion, 
+    string psUsuario, 
+    string psArchivo, 
+    string psOpcion, 
+    bool pBandera = false)
+```
+
+<ParamField path="psUbicacion" type="string" required>
+  Department location code of the commissioned employee
+</ParamField>
+
+<ParamField path="psArchivo" type="string" required>
+  Commission archive identifier (unique commission instance)
+</ParamField>
+
+<ParamField path="psOpcion" type="string" required>
+  Query mode:
+  - `COMISIONADO`: Expenses submitted by employee
+  - `VALIDADOR`: Expenses pending approval
+  - `FINANCIERO`: Expenses approved for payment
+</ParamField>
+
+<ParamField path="pBandera" type="bool">
+  If `true`, includes rejected expenses in results
+</ParamField>
+
+### Retrieve Verification Details
+
+```csharp
+public static DataSet ListaComprobaciones(
+    string psUbicacion, 
+    string psUsuario, 
+    string psfolio, 
+    string psOpcion)
+```
+
+Returns DataSet with multiple tables:
+1. **Comprobantes**: Individual expense items
+2. **Totales**: Summed amounts by concept
+3. **Documentos**: Attached invoice PDFs and XMLs
+
+### Simplified List View
+
+```csharp
+public static List<GridView> ListaComprobantes(
+    string psOficio, 
+    string psComisionado, 
+    string psArchivo, 
+    string psDep)
+```
+
+Returns flat list optimized for data grid display.
+
+## CFDI Invoice Validation
+
+### UUID Uniqueness Check
+
+Critical validation to prevent duplicate invoice submission:
+
+```csharp
+public static string Exist_UUUID(string psUUID)
+```
+
+**Returns**: `"1"` if UUID already exists in system, `"0"` if unique
+
+<Warning>
+  Always call this method **before** accepting a CFDI invoice. Duplicate UUIDs indicate:
+  - The same invoice was already submitted
+  - Potential fraud attempt
+  - Invoice cancellation by SAT
+</Warning>
+
+### UUID Check for Budget Allocations
+
+```csharp
+public static string Exist_UUUID_Ministracion(string psUUID)
+```
+
+Checks if UUID was already used in a ministracion (budget allocation) payment.
+
+### Retrieve Tax Regime Description
+
+```csharp
+public static string Obtiene_RegimenFiscal(string psRegimen)
+```
+
+Converts SAT tax regime code to human-readable description (delegated to `MngNegocioXml`).
+
+## Expense Calculation Methods
+
+### Sum Total by Concept
+
+Calculate total expenses for a specific concept:
+
+```csharp
+public static string Sum_Importe(
+    string psUsuario, 
+    string psUbicacion, 
+    string psConcepto, 
+    string psOficio, 
+    string psArchivo)
+```
+
+<ResponseField name="psConcepto" type="string">
+  Expense concept code:
+  - `VIATICOS`: Travel allowances (meals, lodging)
+  - `COMBUSTIBLE`: Fuel expenses
+  - `PEAJE`: Toll road fees
+  - `PASAJE`: Public transportation
+  - `SINGLADURAS`: Maritime travel allowances
+</ResponseField>
+
+**Returns**: String representation of decimal total (e.g., `"1250.50"`)
+
+### Alternative Sum Method (Audit Reports)
+
+```csharp
+public static string Sum_Importe1(
+    string psUsuario, 
+    string psUbicacion, 
+    string psConcepto, 
+    string psOficio, 
+    string psArchivo)
+```
+
+<Note>
+  `Sum_Importe1` includes **only approved** expenses, while `Sum_Importe` includes all submitted expenses. Use `Sum_Importe1` for audit reports and financial statements.
+</Note>
+
+### Total Across All Concepts
+
+```csharp
+public static string Totales(
+    string psUbicacion, 
+    string psUsuario, 
+    string psfolio, 
+    string psOpcion, 
+    string psConcepto = "")
+```
+
+<ParamField path="psOpcion" type="string">
+  Calculation scope:
+  - `TOTAL`: Sum all expense concepts
+  - `CONCEPTO`: Sum only specified concept
+  - `FISCAL`: Sum only CFDI invoices
+  - `NO_FISCAL`: Sum only non-fiscal receipts
+</ParamField>
+
+### Period Aggregation by Concept
+
+```csharp
+public static string Sum_Totales(
+    string psConcepto, 
+    string psPeriodo, 
+    string psDep)
+```
+
+Aggregates expenses across all commissions in a fiscal period for budget reporting.
+
+### Project-Specific Aggregation
+
+```csharp
+public static string Sum_TotalesProy(
+    string psConcepto, 
+    string psPeriodo, 
+    string psProy, 
+    string psDep)
+```
+
+Aggregates expenses by project code for project budget tracking.
+
+## Non-Fiscal Expense Management
+
+### Retrieve Non-Fiscal Items
+
+```csharp
+public static List<Entidad> Obtiene_No_Facturables(
+    string psComisionado, 
+    string psOficio, 
+    string psTipo, 
+    bool pbandera = false)
+```
+
+<ParamField path="psTipo" type="string">
+  Non-fiscal document type:
+  - `TICKET`: Cash register receipts
+  - `COMPROBANTE`: Simple receipts
+  - `DECLARACION`: Sworn statement (when no documentation available)
+</ParamField>
+
+### Total Non-Fiscal Expenses
+
+```csharp
+public static string Total_No_Fiscal(
+    string psUsuario, 
+    string psDep, 
+    string psComprobante, 
+    string psPeriodo)
+```
+
+<Info>
+  Per SAT regulations, non-fiscal expenses are limited to **3,850 MXN annually** per employee. This method tracks cumulative non-fiscal expenses to enforce the limit.
+</Info>
+
+### Annual Non-Fiscal Limit Check
+
+```csharp
+public static string Total_AnualNoFiscal(string pComisionado)
+```
+
+Returns total non-fiscal expenses for the calendar year.
+
+## Date and Timeline Validation
+
+### Latest Invoice Date
+
+Retrieve the most recent invoice date for validation:
+
+```csharp
+public static string Fecha_Max_Factura(
+    string psUsuario, 
+    string psUbicacion, 
+    string psConcepto, 
+    string psOficio, 
+    string psArchivo, 
+    string psOpcion)
+```
+
+<ParamField path="psOpcion" type="string">
+  Date query type:
+  - `MAX`: Latest invoice date
+  - `MIN`: Earliest invoice date  
+  - `RANGO`: Check if all invoices within commission date range
+</ParamField>
+
+### Verification Submission Date
+
+```csharp
+public static string Obtiene_Fecha_Comprobacion(
+    string psFolio, 
+    string psArchivo)
+```
+
+Returns the date when expense verification was submitted.
+
+### Maximum Date and Amount
+
+```csharp
+public static Entidad Obtiene_FechaMax_Importe(
+    string psArchivo, 
+    string psComisionado, 
+    string psConcepto)
+```
+
+Returns entity with:
+- `Clave`: Latest invoice date
+- `Descripcion`: Total amount for that date
+
+## Budget Compliance Methods
+
+### Total Verified Expenses by Project
+
+```csharp
+public static string Total_Comprobado(
+    string psPeriodo, 
+    string psClvProyecto, 
+    string psTipo)
+```
+
+<ParamField path="psTipo" type="string">
+  Budget line filter:
+  - `VIATICOS`: Travel allowances only
+  - `TRANSPORTES`: Transportation expenses only
+  - `TODOS`: All expense types
+</ParamField>
+
+### Paid vs. Budget Comparison
+
+```csharp
+public static Entidad Obtiene_TotalPagado(
+    string psPeriodo, 
+    string psclaveproy, 
+    string psUbicacionProy, 
+    string psEstatus)
+```
+
+Returns entity with:
+- **Total Approved**: Sum of authorized commission amounts
+- **Total Paid**: Sum of disbursed payments
+- **Pending**: Difference (approved but not yet paid)
+
+## Update Operations
+
+### Update Verification Status
+
+```csharp
+public static Boolean Update_Comprobacion(
+    string psUbicacion, 
+    string psUsuario, 
+    string psfolio, 
+    string psArchivo, 
+    string psEstatus, 
+    string psOpcion = "")
+```
+
+<ResponseField name="psEstatus" type="string">
+  Target verification status:
+  - `EN_REVISION`: Submitted, pending validation
+  - `VALIDADA`: Approved by validator
+  - `RECHAZADA`: Rejected, requires correction
+  - `AUTORIZADA`: Authorized for payment
+  - `PAGADA`: Payment disbursed
+</ResponseField>
+
+### Update Payment Method
+
+Employee can specify payment preference:
+
+```csharp
+public static bool Update_MetodoPagoUsuario(
+    string psUsuario, 
+    string psTimbreFiscal, 
+    string psArchivo,
+    string psTicket)
+```
+
+<ParamField path="psTimbreFiscal" type="string">
+  Preferred payment method:
+  - `DEPOSITO`: Direct bank deposit
+  - `CHEQUE`: Physical check
+  - `TRANSFERENCIA`: Bank transfer
+</ParamField>
+
+## Catalog and Reference Data
+
+### Expense Concept Catalog
+
+```csharp
+public static List<Entidad> Obtiene_Lista_Conceptos()
+```
+
+Returns all valid expense concepts with codes and descriptions:
+
+| Code | Description | Budget Line |
+|------|-------------|-------------|
+| VIATICOS | Meals and lodging allowances | 3801 |
+| COMBUSTIBLE | Fuel for official vehicles | 2611 |
+| PEAJE | Highway toll fees | 3301 |
+| PASAJE | Public transportation | 3751 |
+| SINGLADURAS | Maritime per diem | 3801 |
+
+### Import List by Concept
+
+```csharp
+public static List<Entidad> ObtieneListaImportes(
+    string PSUsuario, 
+    string psConcepto, 
+    string psOficio, 
+    string psArchivo, 
+    string psUbicacion, 
+    string psTipo)
+```
+
+Returns itemized expense list for dropdown population in UI.
+
+### Obtain Expense Details
+
+```csharp
+public static Entidad Obtiene_Comprobaciones(
+    string psPeriodo, 
+    string psUbicacion, 
+    string psOficio, 
+    string psComisionado, 
+    string psConcepto)
+```
+
+Returns detailed breakdown of a specific expense submission.
+
+## Reimbursement Calculation Logic
+
+### Allowance vs. Actual Comparison
+
+The verification process compares:
+
+1. **Authorized Amount**: Pre-approved travel allowance
+2. **Actual Expenses**: Sum of submitted invoices and receipts
+3. **Reimbursement**: Additional payment if actual > authorized
+4. **Refund**: Amount to return if authorized > actual
+
+```csharp
+// Calculation example
+string authorized = MngNegocioComision.Obtiene_Importe_total(
+    psUsuario: "JALP001",
+    psDep: "CRIP-SC",
+    psFolio: "2024-001"
+);
+
+string actual = MngNegocioComprobacion.Totales(
+    psUbicacion: "CRIP-SC",
+    psUsuario: "JALP001",
+    psfolio: "2024-001",
+    psOpcion: "TOTAL"
+);
+
+decimal authAmount = decimal.Parse(authorized);
+decimal actualAmount = decimal.Parse(actual);
+decimal difference = actualAmount - authAmount;
+
+if (difference > 0)
+{
+    // Reimbursement required
+    ProcessReimbursement(difference);
+}
+else if (difference < 0)
+{
+    // Refund required
+    ProcessRefund(Math.Abs(difference));
+}
+```
+
+<Warning>
+  If actual expenses **exceed** the authorized amount, the excess requires **additional budget approval** before reimbursement.
+</Warning>
+
+## Refund Processing
+
+### Obtain Refund Name
+
+```csharp
+public static string NOm_Reintegro(
+    string psOficio, 
+    string psArchivo)
+```
+
+Generates standardized refund document name for accounting.
+
+### Total Amount Method
+
+```csharp
+public static string Total(
+    string psUsuario, 
+    string psDep, 
+    string psArchivo, 
+    string psComprobante)
+```
+
+Calculates net amount after refunds.
+
+## Payment Method Tracking
+
+### Retrieve Payment Method
+
+```csharp
+public static string Metodo_PagoComprobacion(string ID)
+```
+
+Returns payment method selected by employee for a specific verification.
+
+## CFDI XML Processing Integration
+
+While XML parsing is handled by `MngNegocioXml`, this class coordinates validation:
+
+```csharp
+// Typical CFDI validation workflow
+string uuid = ExtractUUIDFromXML(xmlContent);
+
+// Step 1: Check UUID uniqueness
+string exists = MngNegocioComprobacion.Exist_UUUID(uuid);
+
+if (exists == "0")
+{
+    // Step 2: Validate XML structure
+    bool validXml = ValidateCFDISchema(xmlContent);
+    
+    // Step 3: Extract invoice details
+    var invoiceData = ParseCFDIData(xmlContent);
+    
+    // Step 4: Insert expense record
+    bool success = MngNegocioComision.Inserta_Comprobacion_Comision(
+        psXml: xmlFileName,
+        psUUID: uuid,
+        psImporte: invoiceData.Total,
+        // ... other parameters ...
+    );
+}
+```
+
+<Info>
+  CFDI (Comprobante Fiscal Digital por Internet) is the mandatory electronic invoice format in Mexico. All business expenses must be supported by CFDI invoices to be tax-deductible.
+</Info>
+
+## Validation Rules Summary
+
+<AccordionGroup>
+  <Accordion title="Invoice Date Validation">
+    - Invoice date must fall within commission start and end dates
+    - Tolerance: ±3 days for travel time
+    - Fuel invoices: ±1 day before departure allowed
+  </Accordion>
+  
+  <Accordion title="Amount Limits">
+    - Individual meal receipt: ≤ 500 MXN (no CFDI required)
+    - Daily food allowance: Based on zone rate
+    - Non-fiscal annual limit: 3,850 MXN per employee
+    - Fuel: Must match official vehicle assignment
+  </Accordion>
+  
+  <Accordion title="Required Documentation">
+    - CFDI invoice (XML + PDF) for amounts ≥ 500 MXN
+    - Tickets or receipts for amounts < 500 MXN
+    - Sworn statement only when no vendor documentation available
+    - Evidence photos for equipment or field expenses
+  </Accordion>
+  
+  <Accordion title="Budget Line Compliance">
+    - Expense concept must match authorized budget line
+    - Project code must match commission project
+    - Cannot exceed project budget allocation
+    - Requires additional approval if over authorized amount
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling Patterns
+
+Common validation failures:
+
+```csharp
+// UUID already exists
+if (MngNegocioComprobacion.Exist_UUUID(uuid) == "1")
+{
+    throw new ValidationException("UUID duplicado. Esta factura ya fue registrada.");
+}
+
+// Non-fiscal limit exceeded
+decimal currentNonFiscal = decimal.Parse(
+    MngNegocioComprobacion.Total_AnualNoFiscal(employeeId)
+);
+
+if (currentNonFiscal + newAmount > 3850)
+{
+    throw new ValidationException(
+        $"Límite anual de gastos no fiscales excedido. " +
+        $"Acumulado: {currentNonFiscal:C}, Límite: 3,850.00 MXN"
+    );
+}
+
+// Invoice date out of range
+DateTime invoiceDate = DateTime.Parse(fechaFactura);
+DateTime commissionStart = DateTime.Parse(fechaInicio);
+DateTime commissionEnd = DateTime.Parse(fechaFin);
+
+if (invoiceDate < commissionStart.AddDays(-3) || 
+    invoiceDate > commissionEnd.AddDays(3))
+{
+    throw new ValidationException(
+        "Fecha de factura fuera del rango de comisión permitido."
+    );
+}
+```
+
+## Integration with Commission Workflow
+
+Verification status affects commission status:
+
+| Verification Status | Commission Status | Next Action |
+|-------------------|------------------|-------------|
+| Not Started | EFECTIVA | Employee must submit expenses |
+| EN_REVISION | EN_COMPROBACION | Validator reviews |
+| VALIDADA | COMPROBADA | Financial approval |
+| AUTORIZADA | COMPROBADA | Payment processing |
+| PAGADA | PAGADA | Workflow complete |
+| RECHAZADA | EN_COMPROBACION | Employee correction required |
+
+## Example Complete Verification
+
+```csharp
+// Step 1: Employee submits expenses
+foreach (var expense in expenses)
+{
+    // Validate UUID
+    if (MngNegocioComprobacion.Exist_UUUID(expense.UUID) == "0")
+    {
+        MngNegocioComision.Inserta_Comprobacion_Comision(
+            psOficio: commissionId,
+            psComisionado: employeeId,
+            psXml: expense.XmlFile,
+            psUUID: expense.UUID,
+            psImporte: expense.Amount.ToString(),
+            // ... other fields ...
+        );
+    }
+}
+
+// Step 2: Calculate totals
+string totalSubmitted = MngNegocioComprobacion.Totales(
+    psUbicacion: department,
+    psUsuario: employeeId,
+    psfolio: commissionId,
+    psOpcion: "TOTAL"
+);
+
+// Step 3: Compare to authorized amount
+string authorized = MngNegocioComision.Obtiene_Importe_total(
+    psUsuario: employeeId,
+    psDep: department,
+    psFolio: commissionId
+);
+
+// Step 4: Update verification status
+MngNegocioComprobacion.Update_Comprobacion(
+    psUbicacion: department,
+    psUsuario: employeeId,
+    psfolio: commissionId,
+    psArchivo: archiveId,
+    psEstatus: "EN_REVISION"
+);
+
+// Step 5: Update commission status
+MngNegocioComision.Update_estatus_Comision(
+    psEstatus: "EN_COMPROBACION",
+    psUsuario: employeeId,
+    psFolio: commissionId
+);
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Commission Management" href="./commission-management" icon="briefcase">
+    Commission creation and authorization
+  </Card>
+  <Card title="Payment Management" href="./payment-management" icon="money-bill">
+    Payment processing after verification
+  </Card>
+  <Card title="XML Validation" href="../utilities/xml-processing" icon="file-code">
+    CFDI XML parsing and validation
+  </Card>
+  <Card title="Expense Submission Guide" href="../../user-guide/expenses/submission" icon="receipt">
+    User guide for submitting expenses
+  </Card>
+</CardGroup>

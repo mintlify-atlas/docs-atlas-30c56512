@@ -1,0 +1,537 @@
+---
+title: 'Usuario Entity'
+description: 'User authentication, profile, roles, and organizational assignment entity'
+---
+
+## Overview
+
+The `Usuario` class represents a system user with authentication credentials, personal information, organizational assignment, and address details. It supports role-based access control and maintains user profile data for the SMAF application.
+
+```csharp
+namespace InapescaWeb.Entidades
+{
+    public class Usuario
+    {
+        // User authentication and profile properties
+        private string lsUsuario;
+        private string lsPassword;
+        // ... 30+ properties
+    }
+}
+```
+
+**Source:** `InapescaWeb.Entidades/Usuario.cs`
+
+## Constructor
+
+The constructor initializes all string fields to `string.Empty` for safe null handling:
+
+```csharp
+public Usuario()
+{
+    lsUsuario = string.Empty;
+    lsPassword = string.Empty;
+    lsNivel = string.Empty;
+    lsPlaza = string.Empty;
+    lsNombre = string.Empty;
+    lsRFC = string.Empty;
+    lsCURP = string.Empty;
+    lsEmail = string.Empty;
+    // ... all properties initialized to empty string
+}
+```
+
+## Authentication
+
+### Login Credentials
+
+<ParamField path="Usser" type="string">
+  Username for system authentication (login ID)
+</ParamField>
+
+<ParamField path="Password" type="string">
+  User password (should be hashed/encrypted in production)
+</ParamField>
+
+<Warning>
+  Passwords should never be stored in plain text. Implement proper hashing (bcrypt, PBKDF2) in the business logic layer before storing.
+</Warning>
+
+### Security Field
+
+<ParamField path="SEC_EFF" type="string">
+  Security encryption field (possibly for additional authentication data or token)
+</ParamField>
+
+## Personal Information
+
+### Name Components
+
+<ParamField path="Nombre" type="string">
+  First name(s) of the user
+</ParamField>
+
+<ParamField path="ApPat" type="string">
+  Paternal surname (apellido paterno)
+</ParamField>
+
+<ParamField path="ApMat" type="string">
+  Maternal surname (apellido materno)
+</ParamField>
+
+<ParamField path="Abreviatura" type="string">
+  Abbreviated name or initials
+</ParamField>
+
+### Government Identifiers
+
+<ParamField path="RFC" type="string">
+  RFC (Registro Federal de Contribuyentes) - Mexican federal tax ID (13 characters)
+</ParamField>
+
+<ParamField path="CURP" type="string">
+  CURP (Clave Única de Registro de Población) - Mexican national ID (18 characters)
+</ParamField>
+
+<ParamField path="NUM_EMP" type="string">
+  Employee number (número de empleado)
+</ParamField>
+
+### Birth Date
+
+<ParamField path="fech_nac" type="string">
+  Date of birth (fecha de nacimiento)
+</ParamField>
+
+## Address Information
+
+### Street Address
+
+<ParamField path="calle" type="string">
+  Street name
+</ParamField>
+
+<ParamField path="numext" type="string">
+  External number (número exterior)
+</ParamField>
+
+<ParamField path="num_int" type="string">
+  Internal number or apartment/suite (número interior)
+</ParamField>
+
+<ParamField path="colonia" type="string">
+  Neighborhood or colony (colonia)
+</ParamField>
+
+<ParamField path="delegacion" type="string">
+  Municipality or borough (delegación/municipio)
+</ParamField>
+
+### Geographic Location
+
+<ParamField path="CD" type="string">
+  City code (código de ciudad)
+</ParamField>
+
+<ParamField path="Estado" type="string">
+  State or province
+</ParamField>
+
+## Organizational Assignment
+
+### Institutional Hierarchy
+
+<ParamField path="Secretaria" type="string">
+  Secretariat (top-level government ministry)
+</ParamField>
+
+<ParamField path="Organismo" type="string">
+  Organization or agency (e.g., INAPESCA)
+</ParamField>
+
+<ParamField path="Ubicacion" type="string">
+  Specific organizational unit or office location code
+</ParamField>
+
+<ParamField path="Area" type="string">
+  Department or area code within the organization
+</ParamField>
+
+### Position Information
+
+<ParamField path="Plaza" type="string">
+  Position code or plaza number (official employment position)
+</ParamField>
+
+<ParamField path="Puesto" type="string">
+  Job title or position name
+</ParamField>
+
+<ParamField path="Cargo" type="string">
+  Official charge or responsibility level
+</ParamField>
+
+<ParamField path="Nivel" type="string">
+  Organizational level or hierarchy level
+</ParamField>
+
+## Access Control
+
+### Role-Based Authorization
+
+<ParamField path="Rol" type="string">
+  User role for access control (e.g., "Administrador", "Comisionado", "Autorizador", "Consulta")
+</ParamField>
+
+<Info>
+  Roles determine which features and data the user can access. Common roles include:
+  - **Administrador** - Full system access
+  - **Comisionado** - Submit travel requests
+  - **Responsable** - Approve as project manager
+  - **Autorizador** - Final authorization authority
+  - **Consulta** - Read-only access
+  - **Financiero** - Financial operations
+</Info>
+
+## Contact Information
+
+<ParamField path="Email" type="string">
+  Email address for notifications and communication
+</ParamField>
+
+## Usage Examples
+
+### Creating a New User
+
+```csharp
+using InapescaWeb.Entidades;
+
+// Create new user account
+var usuario = new Usuario
+{
+    // Authentication
+    Usser = "maria.gonzalez",
+    Password = "hashed_password_here", // Should be hashed before storage
+    
+    // Personal information
+    Nombre = "María Elena",
+    ApPat = "González",
+    ApMat = "Pérez",
+    RFC = "GOPM850315ABC",
+    CURP = "GOPM850315MOCSRR01",
+    NUM_EMP = "12345",
+    fech_nac = "1985-03-15",
+    
+    // Address
+    calle = "Avenida Juárez",
+    numext = "123",
+    num_int = "4-B",
+    colonia = "Centro",
+    delegacion = "Salina Cruz",
+    Estado = "Oaxaca",
+    CD = "OAX001",
+    
+    // Organization
+    Secretaria = "SADER",
+    Organismo = "INAPESCA",
+    Ubicacion = "CRIP-SC",
+    Area = "Investigación",
+    Plaza = "PL-2024-045",
+    Puesto = "Investigador Titular",
+    Nivel = "N3",
+    Cargo = "Jefe de Proyecto",
+    
+    // Access control
+    Rol = "Comisionado",
+    
+    // Contact
+    Email = "maria.gonzalez@inapesca.gob.mx"
+};
+
+// The entity can now be validated and persisted
+```
+
+### Authentication Check
+
+```csharp
+public class AuthenticationService
+{
+    public bool ValidateCredentials(string username, string password, Usuario usuario)
+    {
+        // In production, compare hashed passwords
+        if (usuario.Usser != username)
+            return false;
+            
+        // Use proper password hashing library
+        // Example: BCrypt.Net.BCrypt.Verify(password, usuario.Password)
+        return VerifyPasswordHash(password, usuario.Password);
+    }
+    
+    private bool VerifyPasswordHash(string password, string storedHash)
+    {
+        // Implement secure password verification
+        // Never compare plain text passwords
+        return BCrypt.Net.BCrypt.Verify(password, storedHash);
+    }
+}
+```
+
+### Role-Based Authorization
+
+```csharp
+public class AuthorizationService
+{
+    public bool CanAuthorizeTravel(Usuario usuario)
+    {
+        // Check if user has authorization role
+        return usuario.Rol == "Autorizador" || 
+               usuario.Rol == "Administrador";
+    }
+    
+    public bool CanViewFinancialData(Usuario usuario)
+    {
+        return usuario.Rol == "Financiero" || 
+               usuario.Rol == "Administrador" ||
+               usuario.Rol == "Autorizador";
+    }
+    
+    public bool CanSubmitTravelRequest(Usuario usuario)
+    {
+        // Most roles can submit except read-only
+        return usuario.Rol != "Consulta";
+    }
+}
+```
+
+### Display Full Name
+
+```csharp
+public static class UsuarioExtensions
+{
+    public static string GetFullName(this Usuario usuario)
+    {
+        return $"{usuario.Nombre} {usuario.ApPat} {usuario.ApMat}".Trim();
+    }
+    
+    public static string GetFormattedName(this Usuario usuario)
+    {
+        // Formal format: LastName, FirstName
+        return $"{usuario.ApPat} {usuario.ApMat}, {usuario.Nombre}".Trim();
+    }
+}
+
+// Usage
+var fullName = usuario.GetFullName(); 
+// "María Elena González Pérez"
+
+var formalName = usuario.GetFormattedName();
+// "González Pérez, María Elena"
+```
+
+## Validation Rules
+
+<Warning>
+  Implement validation in the business logic layer, not in the entity.
+</Warning>
+
+### Required Fields
+
+```csharp
+public class UsuarioValidator
+{
+    public List<string> Validate(Usuario usuario)
+    {
+        var errors = new List<string>();
+        
+        // Authentication required
+        if (string.IsNullOrWhiteSpace(usuario.Usser))
+            errors.Add("Username is required");
+            
+        if (string.IsNullOrWhiteSpace(usuario.Password))
+            errors.Add("Password is required");
+        
+        // Personal information required
+        if (string.IsNullOrWhiteSpace(usuario.Nombre))
+            errors.Add("First name is required");
+            
+        if (string.IsNullOrWhiteSpace(usuario.ApPat))
+            errors.Add("Paternal surname is required");
+            
+        if (string.IsNullOrWhiteSpace(usuario.RFC))
+            errors.Add("RFC is required");
+        
+        // Organization required
+        if (string.IsNullOrWhiteSpace(usuario.Organismo))
+            errors.Add("Organization is required");
+            
+        if (string.IsNullOrWhiteSpace(usuario.Ubicacion))
+            errors.Add("Location is required");
+        
+        // Role required
+        if (string.IsNullOrWhiteSpace(usuario.Rol))
+            errors.Add("Role is required");
+        
+        return errors;
+    }
+}
+```
+
+### Format Validation
+
+```csharp
+public class UsuarioFormatValidator
+{
+    public bool ValidateRFC(string rfc)
+    {
+        // RFC format: 13 characters (AAAA######XXX)
+        if (string.IsNullOrWhiteSpace(rfc))
+            return false;
+            
+        rfc = rfc.Trim().ToUpper();
+        
+        // Basic length check
+        if (rfc.Length != 13)
+            return false;
+            
+        // First 4 characters should be letters
+        // Next 6 should be numbers (YYMMDD)
+        // Last 3 should be alphanumeric
+        // Implement full RFC validation algorithm
+        
+        return true;
+    }
+    
+    public bool ValidateCURP(string curp)
+    {
+        // CURP format: 18 characters
+        if (string.IsNullOrWhiteSpace(curp))
+            return false;
+            
+        curp = curp.Trim().ToUpper();
+        
+        if (curp.Length != 18)
+            return false;
+            
+        // Implement CURP validation algorithm
+        // including check digit verification
+        
+        return true;
+    }
+    
+    public bool ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+            
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+```
+
+## Security Considerations
+
+### Password Management
+
+```csharp
+public class PasswordManager
+{
+    public string HashPassword(string password)
+    {
+        // Use BCrypt with work factor of 12
+        return BCrypt.Net.BCrypt.HashPassword(password, 12);
+    }
+    
+    public bool VerifyPassword(string password, string hash)
+    {
+        return BCrypt.Net.BCrypt.Verify(password, hash);
+    }
+    
+    public bool IsStrongPassword(string password)
+    {
+        // Minimum 8 characters
+        if (password.Length < 8)
+            return false;
+            
+        // Require uppercase, lowercase, digit, special char
+        bool hasUpper = password.Any(char.IsUpper);
+        bool hasLower = password.Any(char.IsLower);
+        bool hasDigit = password.Any(char.IsDigit);
+        bool hasSpecial = password.Any(ch => !char.IsLetterOrDigit(ch));
+        
+        return hasUpper && hasLower && hasDigit && hasSpecial;
+    }
+}
+```
+
+### Session Management
+
+```csharp
+public class UserSession
+{
+    public string SessionId { get; set; }
+    public Usuario Usuario { get; set; }
+    public DateTime LoginTime { get; set; }
+    public DateTime LastActivity { get; set; }
+    public bool IsActive => 
+        (DateTime.Now - LastActivity).TotalMinutes < 30;
+}
+```
+
+## Related Entities
+
+<CardGroup cols={2}>
+  <Card title="Ubicacion" icon="building">
+    Organizational unit details for the user's location
+  </Card>
+  <Card title="Comision" icon="plane" href="./comision">
+    Travel assignments submitted or approved by the user
+  </Card>
+  <Card title="Login" icon="right-to-bracket">
+    Login session and audit trail information
+  </Card>
+  <Card title="Mail" icon="envelope">
+    Email notifications sent to the user
+  </Card>
+</CardGroup>
+
+## Database Considerations
+
+### Indexing
+
+Recommended database indexes:
+
+```sql
+-- Primary key
+CREATE INDEX IX_Usuario_Usser ON Usuario(Usser);
+
+-- Frequently queried fields
+CREATE INDEX IX_Usuario_RFC ON Usuario(RFC);
+CREATE INDEX IX_Usuario_Email ON Usuario(Email);
+CREATE INDEX IX_Usuario_Ubicacion ON Usuario(Ubicacion);
+CREATE INDEX IX_Usuario_Rol ON Usuario(Rol);
+```
+
+### Sensitive Data
+
+<Warning>
+  Ensure proper encryption for sensitive fields:
+  - `Password` - Always hashed, never plain text
+  - `SEC_EFF` - Encrypted security field
+  - Personal identifiers (RFC, CURP) - Consider encryption at rest
+</Warning>
+
+## See Also
+
+- [Entity Overview](./overview) - Entity layer architecture
+- [Authentication](../security/authentication) - User authentication flow
+- [Authorization](../security/authorization) - Role-based access control
+- [Session Management](../security/sessions) - User session handling
+- [Audit Logging](../security/audit) - User activity tracking

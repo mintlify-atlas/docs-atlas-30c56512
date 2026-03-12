@@ -1,0 +1,688 @@
+---
+title: 'PSP Requests'
+description: 'Complete guide for creating professional services provider (PSP) requests in SMAF'
+---
+
+## Overview
+
+PSP (Prestadores de Servicios Profesionales) requests manage contracts for professional service providers within INAPESCA. These requests handle contractor onboarding, contract terms, financial details, and service location assignments.
+
+## Accessing the Request Form
+
+Navigate to **Solicitudes > Solicitud PSP** from the main menu. The form collects comprehensive information about the contractor and contract terms.
+
+## Request Process
+
+<Steps>
+  <Step title="Select Directorate and Service Location">
+    ### Administrative Unit Assignment
+    
+    <ParamField path="dplDireccion" type="dropdown" required>
+      **Dirección General Adjunta**
+      
+      Select the general adjunct directorate for this contract. Available options depend on your organizational unit:
+      
+      - **DGAIPP** (4000) - Dirección General Adjunta de Investigación Pesquera en el Pacífico
+      - **DGAIPA** (3000) - Dirección General Adjunta de Investigación Pesquera en el Atlántico
+      - **DGAIA** (2000) - Dirección General Adjunta de Investigación Acuícola
+      - **DGAA** (5000) - Dirección General Adjunta de Administración
+      - **DGAJ** (6000) - Dirección Jurídica
+    </ParamField>
+    
+    <Note>
+      For CRIP users (regional centers), the directorate is pre-selected based on your center's assignment. Central office users can select any directorate.
+    </Note>
+    
+    ### Service Location
+    
+    <ParamField path="dplLugarPrestacion" type="dropdown" required>
+      **Lugar de Prestación de los servicios**
+      
+      Select the specific location where services will be provided. Options include:
+      - Research centers (CRIPs)
+      - Central offices (Oficinas Centrales)
+      - Regional units
+    </ParamField>
+    
+    #### For Central Office Assignments
+    
+    When assigning to central offices (1000), additional fields appear:
+    
+    <ParamField path="DdlOficina" type="dropdown">
+      **Oficina**
+      
+      - **OFICINA VIVEROS** - Viveros office location
+      - **OFICINA CUAUHTÉMOC** - Cuauhtémoc office location
+    </ParamField>
+    
+    <ParamField path="DdlPiso" type="dropdown">
+      **Piso**
+      
+      For Cuauhtémoc office only:
+      - **PISO 2** - Second floor
+      - **PISO 3** - Third floor
+    </ParamField>
+  </Step>
+  
+  <Step title="Enter Contractor Personal Information">
+    ### Basic Information
+    
+    <ParamField path="txtNombre" type="text" required>
+      **Nombre(s)**
+      
+      Contractor's first and middle names. Auto-converted to uppercase.
+    </ParamField>
+    
+    <ParamField path="txtApPat" type="text" required>
+      **Apellido Paterno**
+      
+      Contractor's paternal last name.
+    </ParamField>
+    
+    <ParamField path="txtApMat" type="text" required>
+      **Apellido Materno**
+      
+      Contractor's maternal last name.
+    </ParamField>
+    
+    <ParamField path="txtCorreo" type="email" required>
+      **Correo electrónico**
+      
+      Valid email address for contractor communications.
+    </ParamField>
+    
+    ### Identification
+    
+    <ParamField path="DdlTipID" type="dropdown" required>
+      **Tipo de Identificación**
+      
+      Select official identification type:
+      - **INSTITUTO NACIONAL ELECTORAL** (INE)
+      - **INSTITUTO FEDERAL ELECTORAL** (IFE - older format)
+      - **PASAPORTE** (Passport)
+      - **CEDULA** (Professional license)
+    </ParamField>
+    
+    <ParamField path="txtNoId" type="text" required>
+      **Número de Identificación**
+      
+      ID number from selected identification document.
+    </ParamField>
+    
+    ### Tax and Banking Information
+    
+    <ParamField path="txtRFC" type="text" required>
+      **R.F.C. con Homoclave**
+      
+      Federal tax ID (RFC) - must be exactly 13 characters including homoclave.
+      
+      **Format**: AAAA######XXX
+      - 4 letters (name initials)
+      - 6 digits (birth date: YYMMDD)
+      - 3 characters (homoclave)
+    </ParamField>
+    
+    <ParamField path="txtActividad" type="text" required>
+      **Actividad con que está dado de alta en el S.A.T.**
+      
+      Economic activity registered with SAT (tax authority).
+      
+      **Example**: "SERVICIOS PROFESIONALES, CIENTIFICOS Y TECNICOS"
+    </ParamField>
+    
+    <ParamField path="txtClabe" type="text" required>
+      **Clabe Interbancaria**
+      
+      18-digit standardized bank account number (CLABE) for direct deposits.
+      
+      **Validation**: Exactly 18 numeric digits, no spaces or hyphens.
+    </ParamField>
+    
+    <Warning>
+      The CLABE must be exactly 18 digits. Double-check this number as payment errors cannot be reversed.
+    </Warning>
+    
+    <ParamField path="txtTel" type="tel" required>
+      **Teléfono**
+      
+      Contact phone number. The system removes formatting characters (spaces, hyphens, parentheses) and validates numeric content.
+    </ParamField>
+  </Step>
+  
+  <Step title="Enter Domicile Information">
+    ### Address Details
+    
+    <ParamField path="txtCalle" type="text" required>
+      **Calle**
+      
+      Street name
+    </ParamField>
+    
+    <ParamField path="txtNumE" type="text" required>
+      **Número Exterior**
+      
+      Exterior number (can be alphanumeric)
+    </ParamField>
+    
+    <ParamField path="txtNumI" type="text">
+      **Número Interior**
+      
+      Interior number (optional, for apartments/suites)
+    </ParamField>
+    
+    <ParamField path="txtColonia" type="text" required>
+      **Colonia**
+      
+      Neighborhood/colony name
+    </ParamField>
+    
+    <ParamField path="txtMunicipio" type="text" required>
+      **Alcaldía o Municipio**
+      
+      Municipality or borough (alcaldía for Mexico City)
+    </ParamField>
+    
+    <ParamField path="txtCP" type="text" required>
+      **C.P.**
+      
+      Postal code (5 digits)
+    </ParamField>
+    
+    <ParamField path="DdlEdo" type="dropdown" required>
+      **Estado**
+      
+      Mexican state where contractor resides
+    </ParamField>
+    
+    <Note>
+      All address information is used for tax receipts and official correspondence. Ensure accuracy.
+    </Note>
+  </Step>
+  
+  <Step title="Define Contract Terms">
+    ### Contract Scope
+    
+    <ParamField path="txtObjContrato" type="textarea" required>
+      **Objeto de Contrato**
+      
+      Detailed description of services to be provided (max 255 characters).
+      
+      **Example**:
+      ```
+      PRESTACION DE SERVICIOS PROFESIONALES PARA REALIZAR 
+      ANALISIS ESTADISTICO DE DATOS BIOLOGICOS Y PESQUEROS, 
+      ELABORACION DE INFORMES TECNICOS Y PRESENTACIONES
+      ```
+    </ParamField>
+    
+    <ParamField path="txtAdCont" type="text">
+      **Administrador del Contrato**
+      
+      Contract administrator name (appears for non-CRIP assignments).
+      
+      For CRIP locations, the center director is automatically assigned as contract administrator.
+    </ParamField>
+    
+    ### Contract Dates
+    
+    <ParamField path="txtFechaI" type="date" required>
+      **Fecha de inicio de vigencia**
+      
+      Contract start date. 
+      
+      <Warning>
+        **Critical**: Start date MUST be either the 1st or 16th of the month. Other dates will be rejected.
+      </Warning>
+      
+      Cannot be earlier than today's date.
+    </ParamField>
+    
+    <ParamField path="txtFin" type="date">
+      **Fecha de final de vigencia**
+      
+      Contract end date (typically December 31 of current fiscal year). Auto-populated and disabled.
+    </ParamField>
+    
+    ### Financial Details
+    
+    <ParamField path="txtMontoMensualSinIVA" type="number" required>
+      **Monto Mensual sin IVA (Subtotal incluye ISR)**
+      
+      Monthly payment amount before VAT (IVA). This is the subtotal that already includes income tax withholding (ISR).
+      
+      **Format**: Numeric value with up to 2 decimal places
+      
+      Example: `15000.00`
+    </ParamField>
+    
+    <Note>
+      After entering the monthly amount, click **Calcular** to auto-calculate IVA, monthly total, and contract total.
+    </Note>
+    
+    <ParamField path="txtIVA" type="number">
+      **IVA**
+      
+      Value-added tax (16%). Auto-calculated when you click Calcular.
+      
+      Calculation: `MontoMensualSinIVA × 0.16`
+    </ParamField>
+    
+    <ParamField path="TextMontoMensualB" type="number">
+      **Monto Mensual IVA incluido**
+      
+      Monthly total including IVA. Auto-calculated.
+      
+      Calculation: `MontoMensualSinIVA + IVA`
+    </ParamField>
+    
+    <ParamField path="TextMontoTotal" type="number">
+      **Monto Total IVA incluido**
+      
+      Total contract value. Auto-calculated based on number of payment periods.
+      
+      Calculation: `MontoMensualConIVA × NumeroExhibiciones`
+      
+      The system calculates number of payment periods (exhibiciones) based on start and end dates.
+    </ParamField>
+  </Step>
+  
+  <Step title="Add Additional Participants (if applicable)">
+    ### Participant 2
+    
+    <ParamField path="TextBox1" type="text" required>
+      **Nombre(s)** - Participant 2 first name
+    </ParamField>
+    
+    <ParamField path="TextBox3" type="text" required>
+      **Apellido Paterno** - Participant 2 paternal surname
+    </ParamField>
+    
+    <ParamField path="TextBox4" type="text" required>
+      **Apellido Materno** - Participant 2 maternal surname
+    </ParamField>
+    
+    <ParamField path="txtMonto2" type="number" required>
+      **Monto Total del Contrato**
+      
+      Total contract amount for participant 2 (with IVA included)
+    </ParamField>
+    
+    ### Participant 3
+    
+    <ParamField path="TextBox5" type="text" required>
+      **Nombre(s)** - Participant 3 first name
+    </ParamField>
+    
+    <ParamField path="TextBox6" type="text" required>
+      **Apellido Paterno** - Participant 3 paternal surname
+    </ParamField>
+    
+    <ParamField path="TextBox7" type="text" required>
+      **Apellido Materno** - Participant 3 maternal surname
+    </ParamField>
+    
+    <ParamField path="TextBox8" type="number" required>
+      **Monto Total del Contrato**
+      
+      Total contract amount for participant 3 (with IVA included)
+    </ParamField>
+    
+    <Note>
+      Additional participants are used when a contract involves multiple service providers working together on the same project.
+    </Note>
+  </Step>
+  
+  <Step title="Review and Submit">
+    ### Pre-Submission Checklist
+    
+    Before clicking **Guardar**, verify:
+    
+    - [ ] All required fields completed
+    - [ ] RFC is exactly 13 characters
+    - [ ] CLABE is exactly 18 digits
+    - [ ] Contract start date is 1st or 16th of month
+    - [ ] Contract start date is not in the past
+    - [ ] Monthly amounts calculated (clicked Calcular button)
+    - [ ] Email address is valid format
+    - [ ] Phone number contains only digits
+    - [ ] All participant information complete (if applicable)
+    
+    ### Submit Request
+    
+    Click **Guardar** to submit the PSP request. The system will:
+    
+    1. Validate all field formats and required data
+    2. Calculate contract periods and totals
+    3. Generate official document with service location details
+    4. Convert monetary amounts to written words (for official documents)
+    5. Insert record into database for approval workflow
+    
+    Success message: "Se ha insertado correctamente la solicitud"
+    
+    ### Clear Form
+    
+    Click **Limpiar** to reset all form fields and start a new request.
+  </Step>
+</Steps>
+
+## Field Validations
+
+The system performs extensive validation in `SolicitudPSP.aspx.cs:305-1121`:
+
+### Text Field Validations
+
+```csharp
+// Name validation (line 358-368)
+if (txtNombre.Text == string.Empty) {
+    alert('Favor de Insertar el Nombre');
+    return;
+}
+Existe = clsFuncionesGral.Exp_Regular(txtNombre.Text);
+if (Existe) {
+    alert('Caracter Invalido en campo NOMBRE');
+    return;
+}
+lsNombre = txtNombre.Text.ToUpper();
+```
+
+All text inputs are validated for:
+- Required field check
+- Special character filtering (no SQL injection characters)
+- Automatic uppercase conversion
+
+### Numeric Field Validations
+
+```csharp
+// CLABE validation (line 507-537)
+if (txtClabe.Text.Length < 18) {
+    alert('La Clabe Interbancaria debe tener 18 Digitos');
+    return;
+}
+if (!clsFuncionesGral.IsNumeric(txtClabe.Text)) {
+    alert('Solo se Aceptan Caracteres Númericos');
+    return;
+}
+```
+
+### Date Validations
+
+```csharp
+// Contract start date validation (line 738-765)
+string diaFeI = Convert.ToString(Convert.ToDateTime(txtFechaI.Text).Day);
+
+if (diaFeI != "1" && diaFeI != "16") {
+    alert('La Fecha de Inicio solo puede ser el día 1ro o el 16');
+    return;
+}
+
+DateTime FechISel = Convert.ToDateTime(txtFechaI.Text);
+if (FechISel < DateTime.Today) {
+    alert('La Fecha de Inicio No puede ser Anterior a la Fecha Actual');
+    return;
+}
+```
+
+<Warning>
+  Contract start dates are strictly limited to the 1st or 16th of any month. This aligns with government payroll periods.
+</Warning>
+
+## Auto-Calculated Fields
+
+Several fields are automatically calculated by the system:
+
+### Financial Calculations
+
+```csharp
+// IVA calculation (16%)
+lsIVA = lsSubtotal × 0.16
+
+// Monthly total with IVA
+lsMontocIVA = lsSubtotal + lsIVA
+
+// Number of payment periods
+int dif = Math.Abs(
+    ((FechaInicio.Month - FechaFin.Month)) + 
+    12 * (FechaInicio.Year - FechaFin.Year)
+);
+int Exhibiciones = dif + 1;
+
+// Total contract value
+lsTotal = lsMontocIVA × Exhibiciones
+```
+
+### Service Location Details
+
+```csharp
+// Auto-generate full address (line 1051-1084)
+oUbicacion = MngNegocioAdscripcion.ObtieneDatosUbicacion(lsLugar);
+
+if (DdlOficina.SelectedValue == "2") {
+    // Cuauhtémoc office with floor
+    DireccionUbica = oUbicacion.Calle + " " + 
+                     oUbicacion.NumExt + " " + 
+                     oUbicacion.Colonia + " " + 
+                     MngNegocioDependencia.Obtiene_Descripcion_Cuidad(...) + 
+                     " C.P. " + oUbicacion.Cp + " " + 
+                     oUbicacion.Estado + " " +
+                     DdlOficina.SelectedItem + " " + 
+                     DdlPiso.SelectedItem;
+}
+```
+
+### Amount Conversion to Words
+
+```csharp
+// Convert amounts to written Spanish (line 1023-1035)
+MontoMensualConIVALetra = clsFuncionesGral.Convertir_Num_Letra(
+    lsMontocIVA, 
+    true  // include "PESOS" text
+);
+
+MontoTotalContLetra = clsFuncionesGral.Convertir_Num_Letra(
+    lsTotal, 
+    true
+);
+```
+
+**Example output**: "QUINCE MIL PESOS 00/100 M.N."
+
+## Code Examples
+
+### Calculate Button Handler
+
+```csharp
+protected void Calcular_Click(object sender, EventArgs e)
+{
+    if (txtMontoMensualSinIVA.Text != "")
+    {
+        // Remove formatting
+        string montoLimpio = txtMontoMensualSinIVA.Text
+            .Replace(",", "")
+            .Replace(" ", "")
+            .Replace("$", "");
+        
+        double subtotal = Convert.ToDouble(montoLimpio);
+        double iva = subtotal * 0.16;
+        double mensualBruto = subtotal + iva;
+        
+        // Calculate periods between dates
+        int meses = Math.Abs(
+            (Convert.ToDateTime(txtFechaI.Text).Month - 
+             Convert.ToDateTime(txtFin.Text).Month) + 
+            12 * (Convert.ToDateTime(txtFechaI.Text).Year - 
+                  Convert.ToDateTime(txtFin.Text).Year)
+        );
+        int exhibiciones = meses + 1;
+        double total = mensualBruto * exhibiciones;
+        
+        // Update fields
+        txtIVA.Text = iva.ToString("N2");
+        TextMontoMensualB.Text = mensualBruto.ToString("N2");
+        TextMontoTotal.Text = total.ToString("N2");
+    }
+}
+```
+
+### Service Location Assignment Logic
+
+```csharp
+protected void dplLugarPrestacion_SelectedIndexChanged(
+    object sender, EventArgs e)
+{
+    string ubicacion = dplLugarPrestacion.SelectedValue;
+    Entidad tipo = MngNegocioDependencia.Obtiene_Tipo_Region(ubicacion);
+    
+    if (tipo.Descripcion == "1") {
+        // CRIP (research center)
+        clsFuncionesGral.Activa_Paneles(pnlOficina, false);
+        // Auto-assign center director as contract admin
+    }
+    else {
+        // Central office
+        clsFuncionesGral.Activa_Paneles(pnlOficina, true);
+        // Show office and floor selection
+    }
+}
+```
+
+## Entity Properties (SolicitudPSP.cs)
+
+Key properties stored in the PSP entity:
+
+```csharp
+public class SolicitudPSP {
+    public string NombrePSP { get; set; }           // First name
+    public string ApPatPSP { get; set; }            // Paternal surname  
+    public string ApMatPSP { get; set; }            // Maternal surname
+    public string EMAIL { get; set; }               // Email address
+    public string TipoID { get; set; }              // ID type code
+    public string NoID { get; set; }                // ID number
+    public string RFC { get; set; }                 // Tax ID (13 chars)
+    public string ACT { get; set; }                 // SAT activity
+    public string Clabe { get; set; }               // Bank account (18 digits)
+    public string Telefono { get; set; }            // Phone number
+    
+    // Address fields
+    public string Calle { get; set; }
+    public string NoExt { get; set; }
+    public string NoInt { get; set; }
+    public string Colonia { get; set; }
+    public string Municipio { get; set; }
+    public string CP { get; set; }
+    public string Estado { get; set; }
+    
+    // Contract fields
+    public string ObjContrato { get; set; }         // Service description
+    public string AdminContr { get; set; }          // Contract administrator
+    public string FechInc { get; set; }             // Start date
+    public string FechFin { get; set; }             // End date
+    public string MontoMensualSinIVA { get; set; }  // Monthly subtotal
+    public string IVA { get; set; }                 // VAT amount
+    public string MontoMensualConIVA { get; set; }  // Monthly total
+    public string MontoTotalCont { get; set; }      // Contract total
+    public string Exhibiciones { get; set; }        // Payment periods
+    public string DiasNat { get; set; }             // Calendar days
+    
+    // Amounts in words (for official docs)
+    public string MontoMensualConIVALetra { get; set; }
+    public string MontoTotalContLetra { get; set; }
+    
+    // Additional participants
+    public string NombrePart2 { get; set; }
+    public string ApPatPart2 { get; set; }
+    public string ApMatPart2 { get; set; }
+    public string MontoTotalContPart2 { get; set; }
+    public string MontoTotalContLetraPart2 { get; set; }
+    
+    public string NombrePart3 { get; set; }
+    public string ApPatPart3 { get; set; }
+    public string ApMatPart3 { get; set; }
+    public string MontoTotalContPart3 { get; set; }
+    public string MontoTotalContLetraPart3 { get; set; }
+    
+    // Location details  
+    public string DGA { get; set; }                 // Directorate code
+    public string Ubicacion { get; set; }           // Location code
+    public string DireccionUbica { get; set; }      // Full address string
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="RFC validation error">
+    **Issue**: "El RFC debe tener 13 Digitos"
+    
+    **Solution**: 
+    - Verify RFC includes 4-letter code + 6-digit date + 3-character homoclave
+    - Example format: `LOPL850615AB1`
+    - Remove any spaces or hyphens
+  </Accordion>
+  
+  <Accordion title="CLABE validation error">
+    **Issue**: "La Clabe Interbancaria debe tener 18 Digitos"
+    
+    **Solution**:
+    - CLABE must be exactly 18 numeric digits
+    - Remove spaces, hyphens, or other formatting
+    - Verify with bank statement - standard Mexican bank account format
+  </Accordion>
+  
+  <Accordion title="Contract date rejected">
+    **Issue**: "La Fecha de Inicio solo puede ser el día 1ro o el 16"
+    
+    **Solution**:
+    - Select either 1st or 16th of the month
+    - These dates align with government payroll cycles
+    - Cannot use other dates even if requested by contractor
+  </Accordion>
+  
+  <Accordion title="Cannot calculate totals">
+    **Issue**: "Favor de dar Clic en el link Calcular"
+    
+    **Solution**:
+    - Enter monthly amount without IVA first
+    - Click the **Calcular** link next to the amount field
+    - System will auto-populate IVA, monthly total, and contract total
+    - Do not manually edit calculated fields
+  </Accordion>
+  
+  <Accordion title="Character validation errors">
+    **Issue**: "Caracter Invalido en campo [field name]"
+    
+    **Solution**:
+    - Remove special characters: `'; " < > = -- /* */`
+    - System filters SQL injection attempts
+    - Use only letters, numbers, spaces, and basic punctuation
+    - Accented characters (á, é, í, ó, ú, ñ) are allowed
+  </Accordion>
+  
+  <Accordion title="Office selection not appearing">
+    **Issue**: Office and floor dropdowns not visible
+    
+    **Solution**:
+    - Office selection only appears for central office (1000) assignments
+    - For CRIP locations, service location is the research center itself
+    - Verify selected service location code
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Contract Approval" icon="file-signature" href="/autorizaciones">
+    Track PSP contract approval workflow
+  </Card>
+  
+  <Card title="Contractor Catalog" icon="users" href="/catalogos/psp">
+    View and manage registered PSP contractors
+  </Card>
+  
+  <Card title="Budget Allocation" icon="calculator" href="/presupuesto">
+    Verify budget availability for contracts
+  </Card>
+  
+  <Card title="Payment Processing" icon="money-bill" href="/pagos">
+    Process monthly PSP payments
+  </Card>
+</CardGroup>

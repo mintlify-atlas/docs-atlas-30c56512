@@ -1,0 +1,232 @@
+---
+title: 'Data Access Layer Overview'
+description: 'Architecture and design patterns of the SMAF Data Access Layer'
+---
+
+## Purpose
+
+The Data Access Layer (DAL) in SMAF provides a centralized abstraction for all database operations, ensuring consistent data access patterns across the application. Located in the `InapescaWeb.DAL` namespace, the DAL implements a repository-like pattern with specialized manager classes for different business domains.
+
+## Architecture
+
+### Layer Separation
+
+The DAL maintains strict separation between business logic and data access:
+
+```
+Presentation Layer (Web)
+        ↓
+Business Logic Layer (Entidades)
+        ↓
+Data Access Layer (DAL) ← You are here
+        ↓
+MySQL Database
+```
+
+**Key principles:**
+- Business entities are passed as parameters but never modified by DAL methods
+- SQL queries are constructed and executed exclusively in DAL classes
+- Connection management is centralized through `MngConexion`
+- No business logic resides in DAL - only data retrieval and persistence
+
+### Manager Classes Structure
+
+The DAL is organized into specialized manager classes following the naming convention `MngDatos*`:
+
+| Manager Class | Responsibility |
+|--------------|----------------|
+| `MngConexion` | Database connection management and encryption |
+| `MngDatosComision` | Travel commission data operations |
+| `MngDatosUsuarios` | User data retrieval and management |
+| `MngDatosViaticos` | Travel allowance calculations |
+| `MngDatosProyecto` | Project data operations |
+| `MngDatosCatalogos` | Catalog and lookup tables |
+| `MngDatosReportes` | Report data aggregation |
+| `MngActualizaDatos` | User profile update operations |
+
+<Note>
+Each manager class focuses on a specific business domain, containing only static methods for data access. This design simplifies dependency management and ensures stateless operations.
+</Note>
+
+## Data Access Patterns
+
+### Query Pattern
+
+Most read operations follow this standard pattern:
+
+```csharp
+public static List<Entidad> ObtainCatalogData(string parameter)
+{
+    string Query = "";
+    Query = "SELECT CLV_FIELD AS CODIGO, DESCRIPTION AS DESCRIPCION ";
+    Query += "FROM table_name WHERE ESTATUS = '1' ";
+    Query += "AND FIELD = '" + parameter + "'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+
+    List<Entidad> ListaEntidad = new List<Entidad>();
+
+    while (Reader.Read())
+    {
+        Entidad obj = new Entidad();
+        obj.Codigo = Convert.ToString(Reader["CODIGO"]);
+        obj.Descripcion = Convert.ToString(Reader["DESCRIPCION"]);
+        ListaEntidad.Add(obj);
+    }
+
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return ListaEntidad;
+}
+```
+
+### Insert/Update Pattern
+
+Write operations return boolean success indicators:
+
+```csharp
+public static Boolean Update_Record(EntityObject poEntity, string psId)
+{
+    Boolean lbResultado = false;
+    
+    string Query = "UPDATE table_name SET ";
+    Query += "FIELD1 = '" + poEntity.Field1 + "', ";
+    Query += "FIELD2 = '" + poEntity.Field2 + "', ";
+    Query += "FECHEFF = '" + clsFunciones.FormatFecha(DateTime.Today.ToString()) + "' ";
+    Query += "WHERE ID = '" + psId + "' AND ESTATUS = '1'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+
+    if (cmd.ExecuteNonQuery() == 1) 
+        lbResultado = true;
+    else 
+        lbResultado = false;
+
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return lbResultado;
+}
+```
+
+## Exception Handling Strategy
+
+### Current Implementation
+
+The DAL uses a **fail-safe** approach where exceptions are caught at higher layers:
+
+- DAL methods do not throw exceptions
+- Failed operations return `null`, empty collections, or `false`
+- Connection disposal occurs in `finally` blocks (implicit in using statements)
+- The presentation layer checks return values to determine success
+
+**Example from production code:**
+
+```csharp
+public static string Obtiene_Cargo(string psUsuario)
+{
+    string cargo = "";
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+
+    if (Reader.Read())
+    {
+        cargo = Convert.ToString(Reader["CARGO"]);
+    }
+    else
+    {
+        cargo = "";  // Returns empty string instead of throwing
+    }
+    
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return cargo;
+}
+```
+
+<Warning>
+The current implementation uses string concatenation for SQL queries. While this pattern exists throughout the legacy codebase, new development should consider parameterized queries to prevent SQL injection vulnerabilities.
+</Warning>
+
+## Stored Procedure Usage
+
+### Current State
+
+SMAF's DAL **does not use stored procedures**. All data access is performed through dynamically constructed SQL statements within the C# code.
+
+**Rationale:**
+- Direct SQL provides better visibility into query logic
+- Easier debugging during development
+- Simplified deployment (no database-side code changes)
+- Query construction can adapt dynamically to business rules
+
+**Trade-offs:**
+- Less database-side optimization
+- SQL logic distributed across multiple DAL classes
+- Potential for query duplication
+
+## Database Technology
+
+SMAF uses **MySQL** as its database backend, accessed via the `MySql.Data.MySqlClient` library.
+
+**Key characteristics:**
+- All queries target MySQL-specific syntax
+- Connection strings stored encrypted in `Web.config`
+- Multiple database connections supported (SMAF, Contratos, DGAIPP modules)
+- Connection pooling handled by MySqlConnection provider
+
+## Common Conventions
+
+### Method Naming
+
+| Prefix | Purpose | Return Type |
+|--------|---------|-------------|
+| `Obtiene_` | Retrieve single value | `string`, `int`, or entity |
+| `Lista_` | Retrieve collection | `List<T>` |
+| `Inserta_` | Insert new record | `Boolean` |
+| `Update_` | Modify existing record | `Boolean` |
+| `Obtiene_Max_` | Get next sequence number | `string` |
+
+### Data Conversion
+
+All database values are retrieved as strings and converted as needed:
+
+```csharp
+// Standard pattern used throughout DAL
+objEntity.Field = Convert.ToString(Reader["COLUMN_NAME"]);
+objEntity.Number = Convert.ToInt32(Reader["NUMBER_COLUMN"]);
+```
+
+### Null Handling
+
+Empty values are typically represented as empty strings rather than null:
+
+```csharp
+if (resultado == "")
+{
+    resultado = "0";  // Default value instead of null
+}
+```
+
+## Best Practices
+
+<Note>
+**When working with SMAF's DAL:**
+
+1. Always dispose connections using `MngConexion.disposeConexionSMAF()`
+2. Close DataReaders before disposing connections
+3. Use `clsFunciones.FormatFecha()` for date formatting
+4. Check for empty string results from query methods
+5. Follow existing naming conventions for consistency
+6. Keep business logic out of DAL methods
+</Note>
+
+## Related Documentation
+
+- [Database Connection Management](/technical/dal/database-connection)
+- [Data Operations Patterns](/technical/dal/data-operations)
+- [Business Entities](/technical/architecture/entities)

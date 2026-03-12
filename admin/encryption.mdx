@@ -1,0 +1,634 @@
+---
+title: Encryption and Data Protection
+description: Rijndael/AES encryption implementation, key management, and data security in SMAF
+---
+
+## Overview
+
+SMAF implements encryption to protect sensitive data including connection strings, user credentials, and configuration parameters. The system uses the Rijndael algorithm (AES) for symmetric encryption with hardcoded encryption keys.
+
+## Encryption Implementation
+
+### Rijndael/AES Encryption
+
+The system implements Rijndael (Advanced Encryption Standard) through the `MngEncriptacion` class:
+
+```csharp
+using System.Security.Cryptography;
+using System.IO;
+
+namespace InapescaWeb.DAL
+{
+    public class MngEncriptacion
+    {
+        private static byte[] _key = Encoding.ASCII.GetBytes("InapescaWeb");
+        private static byte[] _iv = Encoding.ASCII.GetBytes("InapescaWeb.Mysql");
+    }
+}
+```
+
+<Note>
+**Rijndael** is the algorithm selected as the Advanced Encryption Standard (AES). The implementation uses symmetric key encryption with the same key for both encryption and decryption operations.
+</Note>
+
+### Encryption Method
+
+The `encryptString` method encrypts plain text strings:
+
+```csharp
+public static string encryptString(string cadena)
+{
+    string cadenaEncriptada = "";
+    
+    try
+    {
+        // Convert input string to bytes
+        byte[] inputBytes = Encoding.ASCII.GetBytes(cadena);
+        byte[] encripted;
+        
+        // Create Rijndael cipher
+        RijndaelManaged cripto = new RijndaelManaged();
+        
+        using (MemoryStream ms = new MemoryStream(inputBytes.Length))
+        {
+            // Create crypto stream with encryptor
+            using (CryptoStream objCryptoStream = new CryptoStream(
+                ms, 
+                cripto.CreateEncryptor(_key, _iv), 
+                CryptoStreamMode.Write))
+            {
+                // Write encrypted data to stream
+                objCryptoStream.Write(inputBytes, 0, inputBytes.Length);
+                objCryptoStream.FlushFinalBlock();
+                objCryptoStream.Close();
+            }
+            
+            // Get encrypted bytes
+            encripted = ms.ToArray();
+        }
+        
+        // Convert to Base64 string for storage/transmission
+        cadenaEncriptada = Convert.ToBase64String(encripted);
+        
+        return cadenaEncriptada;
+    }
+    catch (Exception ex)
+    {
+        return cadenaEncriptada;
+    }
+}
+```
+
+### Encryption Process Flow
+
+<Steps>
+  <Step title="Convert to bytes">
+    The input string is converted to a byte array using ASCII encoding.
+  </Step>
+
+  <Step title="Create cipher">
+    A `RijndaelManaged` object is instantiated to perform the encryption.
+  </Step>
+
+  <Step title="Initialize crypto stream">
+    A `CryptoStream` is created with the encryptor transform using the static key and IV.
+  </Step>
+
+  <Step title="Write encrypted data">
+    The plain text bytes are written to the crypto stream, which encrypts them.
+  </Step>
+
+  <Step title="Finalize and encode">
+    The encrypted bytes are converted to Base64 string format for safe storage and transmission.
+  </Step>
+</Steps>
+
+## Decryption Implementation
+
+### Decryption Method
+
+The `decripString` method decrypts encrypted strings:
+
+```csharp
+public static string decripString(string cadena)
+{
+    string cadenaDesencriptada = "";
+    
+    try
+    {
+        // Convert Base64 string back to bytes
+        byte[] inputBytes = Convert.FromBase64String(cadena);
+        byte[] resultBytes = new byte[inputBytes.Length];
+        string textoLimpio = String.Empty;
+        
+        // Create Rijndael cipher
+        RijndaelManaged cripto = new RijndaelManaged();
+        
+        using (MemoryStream ms = new MemoryStream(inputBytes))
+        {
+            // Create crypto stream with decryptor
+            using (CryptoStream objCryptoStream = new CryptoStream(
+                ms, 
+                cripto.CreateDecryptor(_key, _iv), 
+                CryptoStreamMode.Read))
+            {
+                // Read decrypted data
+                using (StreamReader sr = new StreamReader(objCryptoStream, true))
+                {
+                    textoLimpio = sr.ReadToEnd();
+                }
+            }
+        }
+        
+        cadenaDesencriptada = textoLimpio;
+        
+        return cadenaDesencriptada;
+    }
+    catch (Exception ex)
+    {
+        return cadenaDesencriptada;
+    }
+}
+```
+
+### Decryption Process Flow
+
+<Steps>
+  <Step title="Decode Base64">
+    The Base64 encoded string is converted back to its encrypted byte array.
+  </Step>
+
+  <Step title="Create cipher">
+    A `RijndaelManaged` object is instantiated with the same configuration.
+  </Step>
+
+  <Step title="Initialize crypto stream">
+    A `CryptoStream` is created with the decryptor transform using the same key and IV.
+  </Step>
+
+  <Step title="Read decrypted data">
+    A `StreamReader` reads the plain text from the crypto stream.
+  </Step>
+
+  <Step title="Return plain text">
+    The decrypted string is returned to the caller.
+  </Step>
+</Steps>
+
+## Key Management
+
+### Static Encryption Keys
+
+The system uses hardcoded encryption keys:
+
+```csharp
+private static byte[] _key = Encoding.ASCII.GetBytes("InapescaWeb");
+private static byte[] _iv = Encoding.ASCII.GetBytes("InapescaWeb.Mysql");
+```
+
+<ParamField path="_key" type="byte[]">
+  **Encryption Key**: `"InapescaWeb"` (11 characters)
+  
+  Used as the symmetric key for encryption/decryption operations.
+</ParamField>
+
+<ParamField path="_iv" type="byte[]">
+  **Initialization Vector (IV)**: `"InapescaWeb.Mysql"` (17 characters)
+  
+  Provides additional randomization for the cipher.
+</ParamField>
+
+<Warning>
+**Security Risk**: Using hardcoded encryption keys is a significant security vulnerability. The keys are embedded in the source code and can be extracted through reverse engineering. 
+
+**Recommendations:**
+- Store keys in secure configuration management systems (e.g., Azure Key Vault, AWS KMS)
+- Use environment variables or secure configuration files with restricted access
+- Implement key rotation policies
+- Use longer, more complex keys (at least 256 bits for AES-256)
+</Warning>
+
+## Connection String Encryption
+
+### Encrypted Connection Strings
+
+Database connection strings are stored encrypted in the application configuration:
+
+```csharp
+public static MySqlConnection getConexionMysql()
+{
+    // Retrieve encrypted connection string from config
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost"];
+    
+    // Decrypt connection string
+    string CadenaConexion = MngEncriptacion.decripString(
+        CadenaConexionEncriptada
+    );
+    
+    // Create connection with decrypted string
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+```
+
+### Multiple Database Connections
+
+The system manages multiple encrypted connection strings:
+
+```csharp
+// Main SMAF database
+public static MySqlConnection getConexionMysql()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+
+// DGAIPP module database
+public static MySqlConnection getConexionMysql_dgaipp()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost_dgaipp"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql1 = new MySqlConnection(CadenaConexion);
+    return ConexionMysql1;
+}
+
+// Contracts module database
+public static MySqlConnection getConexionMysql_Contratos()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhostContratos"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql2 = new MySqlConnection(CadenaConexion);
+    return ConexionMysql2;
+}
+
+// Query module database
+public static MySqlConnection getConexionMysql_ModuloConsulta()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["RemoteModuloConsulta"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+```
+
+<Note>
+All database connection strings are stored encrypted in the application configuration file and decrypted at runtime before creating database connections.
+</Note>
+
+## Password Encryption
+
+### User Authentication
+
+During login, usernames are encrypted for transmission:
+
+```csharp
+public static Usuario Acceso_Smaf(string psUbicacion, 
+                                  string psUsuario, 
+                                  string psPassword)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, " +
+                     "PASSWORD AS PASSWORD, NIVEL, PLAZA, PUESTO, " +
+                     "SECRETARIA, ORGANISMO, DEPENDENCIA AS UBICACION, " +
+                     "AREA, NOMBRE, APELLIDO_PAT, APELLIDO_MAT, " +
+                     "RFC, CARGO, EMAIL, ROL, ABREVIATURA " +
+                     "FROM vw_usuarios " +
+                     "WHERE USSER = '" + MngEncriptacion.decripString(psUsuario) + "' " +
+                     "AND PASSWORD = '" + psPassword + "'";
+}
+```
+
+<Warning>
+**Password Security Issue**: Passwords are stored and compared in plain text. This is a critical security vulnerability.
+
+**Current Implementation:**
+- Usernames are encrypted during transmission
+- Passwords are stored as plain text in database
+- Passwords are compared directly without hashing
+
+**Recommended Solution:**
+- Implement password hashing using bcrypt, PBKDF2, or Argon2
+- Store only the hash, never the plain text password
+- Add salt to prevent rainbow table attacks
+- Use timing-safe comparison to prevent timing attacks
+</Warning>
+
+## Data Protection Strategies
+
+### Encryption at Rest
+
+Currently encrypted data:
+
+<Steps>
+  <Step title="Connection strings">
+    Database connection strings in configuration files are encrypted using Rijndael.
+  </Step>
+
+  <Step title="User credentials in transit">
+    Usernames are encrypted when transmitted from client to server during authentication.
+  </Step>
+</Steps>
+
+### Data Not Encrypted
+
+<Warning>
+The following sensitive data is **NOT** currently encrypted:
+
+- User passwords (stored in plain text)
+- Personal information (RFC, CURP, addresses)
+- Financial data (expense amounts, budget figures)
+- Email addresses and contact information
+</Warning>
+
+## Encryption Best Practices
+
+### Current Implementation Issues
+
+<Steps>
+  <Step title="Hardcoded keys">
+    **Issue**: Encryption keys are hardcoded in source code.
+    
+    **Risk**: Keys can be extracted through reverse engineering.
+    
+    **Solution**: Move keys to secure key management system.
+  </Step>
+
+  <Step title="Weak key strength">
+    **Issue**: Key is only 11 bytes (88 bits), IV is 17 bytes.
+    
+    **Risk**: Insufficient key length for strong encryption.
+    
+    **Solution**: Use minimum 256-bit (32-byte) keys for AES-256.
+  </Step>
+
+  <Step title="No key rotation">
+    **Issue**: Keys are static and never changed.
+    
+    **Risk**: Long-term use increases vulnerability.
+    
+    **Solution**: Implement periodic key rotation policy.
+  </Step>
+
+  <Step title="Plain text passwords">
+    **Issue**: Passwords stored without hashing.
+    
+    **Risk**: Database breach exposes all passwords.
+    
+    **Solution**: Implement password hashing with salt.
+  </Step>
+
+  <Step title="Limited error handling">
+    **Issue**: Encryption errors return empty strings.
+    
+    **Risk**: Silent failures may lead to security issues.
+    
+    **Solution**: Log errors and implement proper error handling.
+  </Step>
+</Steps>
+
+### Recommended Improvements
+
+<CodeGroup>
+
+```csharp Secure Key Management
+// Use configuration-based key management
+public class MngEncriptacion
+{
+    private static byte[] GetEncryptionKey()
+    {
+        // Retrieve from secure key vault
+        string keyFromVault = KeyVaultClient.GetSecret("EncryptionKey");
+        return Convert.FromBase64String(keyFromVault);
+    }
+    
+    private static byte[] GetIV()
+    {
+        string ivFromVault = KeyVaultClient.GetSecret("EncryptionIV");
+        return Convert.FromBase64String(ivFromVault);
+    }
+}
+```
+
+```csharp Password Hashing
+using System.Security.Cryptography;
+
+public static string HashPassword(string password)
+{
+    // Generate salt
+    byte[] salt = new byte[16];
+    using (var rng = new RNGCryptoServiceProvider())
+    {
+        rng.GetBytes(salt);
+    }
+    
+    // Hash password with PBKDF2
+    var pbkdf2 = new Rfc2898DeriveBytes(
+        password, 
+        salt, 
+        10000,  // iterations
+        HashAlgorithmName.SHA256
+    );
+    
+    byte[] hash = pbkdf2.GetBytes(32);
+    
+    // Combine salt and hash
+    byte[] hashBytes = new byte[48];
+    Array.Copy(salt, 0, hashBytes, 0, 16);
+    Array.Copy(hash, 0, hashBytes, 16, 32);
+    
+    return Convert.ToBase64String(hashBytes);
+}
+
+public static bool VerifyPassword(string password, string hashedPassword)
+{
+    byte[] hashBytes = Convert.FromBase64String(hashedPassword);
+    
+    // Extract salt
+    byte[] salt = new byte[16];
+    Array.Copy(hashBytes, 0, salt, 0, 16);
+    
+    // Hash input password with same salt
+    var pbkdf2 = new Rfc2898DeriveBytes(
+        password, 
+        salt, 
+        10000,
+        HashAlgorithmName.SHA256
+    );
+    
+    byte[] hash = pbkdf2.GetBytes(32);
+    
+    // Compare hashes
+    for (int i = 0; i < 32; i++)
+    {
+        if (hashBytes[i + 16] != hash[i])
+            return false;
+    }
+    
+    return true;
+}
+```
+
+```csharp AES-256 Encryption
+public static string EncryptString(string plainText, byte[] key, byte[] iv)
+{
+    using (Aes aes = Aes.Create())
+    {
+        aes.KeySize = 256;  // Use AES-256
+        aes.Key = key;       // 32-byte key
+        aes.IV = iv;         // 16-byte IV
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+        
+        ICryptoTransform encryptor = aes.CreateEncryptor();
+        
+        using (MemoryStream ms = new MemoryStream())
+        {
+            using (CryptoStream cs = new CryptoStream(
+                ms, encryptor, CryptoStreamMode.Write))
+            {
+                using (StreamWriter sw = new StreamWriter(cs))
+                {
+                    sw.Write(plainText);
+                }
+            }
+            
+            return Convert.ToBase64String(ms.ToArray());
+        }
+    }
+}
+```
+
+</CodeGroup>
+
+## Encryption Usage Examples
+
+### Encrypting Configuration Data
+
+```csharp
+// Encrypt a connection string before storing in config
+string plainConnectionString = 
+    "Server=localhost;Database=smaf;Uid=user;Pwd=password;";
+string encryptedConnectionString = 
+    MngEncriptacion.encryptString(plainConnectionString);
+
+// Store in configuration file
+ConfigurationManager.AppSettings["localhost"] = encryptedConnectionString;
+```
+
+### Decrypting Configuration Data
+
+```csharp
+// Retrieve and decrypt connection string
+string encryptedConnectionString = 
+    ConfigurationManager.AppSettings["localhost"];
+string plainConnectionString = 
+    MngEncriptacion.decripString(encryptedConnectionString);
+
+// Use decrypted connection string
+MySqlConnection conn = new MySqlConnection(plainConnectionString);
+```
+
+### Authentication with Encryption
+
+```csharp
+// Client-side: Encrypt username before sending
+string encryptedUsername = MngEncriptacion.encryptString(txtUsername.Text);
+string password = txtPassword.Text;
+
+// Send to server
+Usuario user = MngDatosLogin.Acceso_Smaf(
+    psUbicacion: selectedDepartment,
+    psUsuario: encryptedUsername,
+    psPassword: password
+);
+
+// Server-side: Decrypt username for query
+string decryptedUsername = MngEncriptacion.decripString(psUsuario);
+```
+
+## Security Audit Recommendations
+
+<Steps>
+  <Step title="Immediate actions">
+    - Implement password hashing for all user passwords
+    - Move encryption keys to environment variables or key vault
+    - Use AES-256 with proper key lengths
+    - Enable HTTPS/TLS for all communications
+  </Step>
+
+  <Step title="Short-term improvements">
+    - Encrypt sensitive personal data (RFC, CURP, addresses)
+    - Implement key rotation policy
+    - Add comprehensive error logging for encryption operations
+    - Implement database field-level encryption for sensitive columns
+  </Step>
+
+  <Step title="Long-term enhancements">
+    - Implement public key infrastructure (PKI) for certificate management
+    - Add hardware security module (HSM) support
+    - Implement data classification and encryption policies
+    - Regular security audits and penetration testing
+  </Step>
+</Steps>
+
+## Compliance Considerations
+
+<Warning>
+For compliance with data protection regulations (e.g., Mexican Federal Data Protection Law):
+
+- **Encrypt personal data at rest**: RFC, CURP, addresses, contact information
+- **Encrypt financial data**: Salary information, expense amounts, bank details
+- **Implement access logging**: Track who accesses encrypted data
+- **Key escrow**: Maintain secure key backup for data recovery
+- **Data retention**: Encrypt archived data and implement secure deletion
+</Warning>
+
+## Algorithm Specifications
+
+### Rijndael Configuration
+
+<ParamField path="Algorithm" type="string">
+  **Rijndael / AES (Advanced Encryption Standard)**
+  
+  Symmetric block cipher used for encryption operations.
+</ParamField>
+
+<ParamField path="Key Size" type="integer">
+  **88 bits (11 bytes)** - Current implementation
+  
+  **Recommendation**: Use 256 bits (32 bytes) for AES-256
+</ParamField>
+
+<ParamField path="IV Size" type="integer">
+  **136 bits (17 bytes)** - Current implementation
+  
+  **Recommendation**: Use 128 bits (16 bytes) standard AES block size
+</ParamField>
+
+<ParamField path="Mode" type="string">
+  **CBC (Cipher Block Chaining)** - Default mode
+  
+  Recommended for most use cases with proper IV management.
+</ParamField>
+
+<ParamField path="Padding" type="string">
+  **PKCS7** - Default padding scheme
+  
+  Standard padding for block ciphers.
+</ParamField>
+
+<ParamField path="Encoding" type="string">
+  **Base64** - Output encoding
+  
+  Encrypted bytes are encoded as Base64 strings for storage and transmission.
+</ParamField>

@@ -1,0 +1,674 @@
+---
+title: 'Data Operations Patterns'
+description: 'CRUD operations, query execution, and data manipulation patterns in SMAF DAL'
+---
+
+## MngDatos Classes
+
+The `MngDatos*` family of classes implements data access operations for specific business domains. Each class contains static methods that execute SQL queries and return strongly-typed results.
+
+### Common Classes
+
+| Class | Domain | Key Operations |
+|-------|--------|----------------|
+| `MngDatosComision` | Travel commissions | Query commissions, insert/update commission records |
+| `MngDatosUsuarios` | Users | User lookup, role retrieval, personal data |
+| `MngDatosViaticos` | Travel allowances | Zone rates, allowance calculations |
+| `MngDatosProyecto` | Projects | Project catalogs, assignments |
+| `MngDatosCatalogos` | Catalogs | Lookup tables (states, cities, types) |
+| `MngActualizaDatos` | Updates | User profile updates, data modifications |
+
+## Query Operations (SELECT)
+
+### Single Record Retrieval
+
+Retrieving a single entity from the database:
+
+```csharp
+public static TipoCambio TipoCambio(string psUsuario, string psFecha)
+{
+    string query = "";
+    query += " SELECT * ";
+    query += " FROM crip_tipo_cambio ";
+    query += " WHERE USUARIO = '" + psUsuario + "'";
+    query += " AND FECHA_CAMBIO = '" + psFecha + "'";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+    
+    TipoCambio tc = new TipoCambio();
+    
+    while (Reader.Read())
+    {
+        tc.Denominacion = Convert.ToString(Reader["DENOMINACION"]);
+        tc.Tipo_Cambio = Convert.ToString(Reader["TIPO_CAMBIO"]);
+        tc.Tarifa = Convert.ToString(Reader["TARIFA_AUT"]);
+        tc.Fecha = Convert.ToString(Reader["FECHA_CAMBIO"]);
+        tc.Usuario = Convert.ToString(Reader["USUARIO"]);
+    }
+    
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return tc;
+}
+```
+
+**Key characteristics:**
+- Uses `while (Reader.Read())` even for single records
+- Properties populated directly from DataReader
+- Returns populated entity object
+- Empty object returned if no records found
+
+### Collection Retrieval
+
+Retrieving multiple records into a list:
+
+```csharp
+public static List<Entidad> Obtiene_Zonas()
+{
+    string Query = "SELECT CLV_ZONA AS CODIGO, ";
+    Query += "CONCAT(DESCRIPCION, ' - $ ', TARIFA) AS DESCRIPCION ";
+    Query += "FROM crip_zonas ";
+    Query += "WHERE ESTATUS = '1'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+
+    List<Entidad> ListaEntidad = new List<Entidad>();
+    
+    // Optional: Add default "select" option
+    Entidad obj = new Entidad();
+    obj.Codigo = string.Empty;
+    obj.Descripcion = " = S E L E C C I O N E = ";
+    ListaEntidad.Add(obj);
+
+    while (Reader.Read())
+    {
+        Entidad objetoEntidad = new Entidad();
+        objetoEntidad.Codigo = Convert.ToString(Reader["CODIGO"]);
+        objetoEntidad.Descripcion = Convert.ToString(Reader["DESCRIPCION"]);
+        ListaEntidad.Add(objetoEntidad);
+    }
+
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return ListaEntidad;
+}
+```
+
+**Pattern notes:**
+- Initialize empty list before populating
+- Commonly add default "SELECCIONE" option for dropdowns
+- Create new entity instance for each row
+- Return list even if empty (never null)
+
+### Scalar Value Retrieval
+
+Retrieving single calculated or aggregated values:
+
+```csharp
+public static string Dias_Acumulados(string psComisionado, string psPeriodo)
+{
+    string dias = "";
+    
+    string Query = "SELECT SUM(A.DIAS_COMERCIAL) + ";
+    Query += "SUM(A.DIAS_RURAL) + SUM(A.DIAS_50KM) AS DIAS ";
+    Query += "FROM crip_comision A ";
+    Query += "WHERE A.USUARIO = '" + psComisionado + "' ";
+    Query += "AND A.ESTATUS NOT IN ('0','1') ";
+    Query += "AND A.ZONA_COMERCIAL NOT IN ('0','15','18') ";
+    Query += "AND A.PERIODO = '" + psPeriodo + "' ";
+    Query += "AND TERRITORIO != '3'";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+
+    if (Reader.Read())
+    {
+        dias = Convert.ToString(Reader["DIAS"]);
+    }
+
+    // Handle null/empty results
+    if (dias == "")
+    {
+        dias = "0";
+    }
+    
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return dias;
+}
+```
+
+<Note>
+Scalar queries use `if (Reader.Read())` instead of `while` since only one row is expected. Always provide a default value for empty results.
+</Note>
+
+## Insert Operations
+
+### Basic Insert Pattern
+
+```csharp
+public static Boolean Inserta_Alterno(string psFolio, string psUbicacion, 
+                                       string psComisionado)
+{
+    Boolean lbResultado;
+    string lsHoy = clsFunciones.FormatFecha(DateTime.Today.ToString());
+
+    string Query = "INSERT INTO crip_alt ";
+    Query += "(NO_OFICIO, CLV_DEP, COMISIONADO, FECHA) ";
+    Query += "VALUES ";
+    Query += "('" + psFolio + "', ";
+    Query += "'" + psUbicacion + "', ";
+    Query += "'" + psComisionado + "', ";
+    Query += "'" + lsHoy + "')";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+
+    if (cmd.ExecuteNonQuery() == 1)
+    {
+        lbResultado = true;
+    }
+    else
+    {
+        lbResultado = false;
+    }
+
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return lbResultado;
+}
+```
+
+**Key points:**
+- Returns `Boolean` indicating success
+- Uses `ExecuteNonQuery()` instead of `ExecuteReader()`
+- Checks if exactly 1 row was affected
+- Date formatting via `clsFunciones.FormatFecha()`
+
+### Complex Insert with Entity Object
+
+```csharp
+public static Boolean Inserta_Comprobacion_Comision(
+    string psOficio, string psClvOficio, string psComisionado, 
+    string psUbicacionComisionado, string psFechaFactura, 
+    string psProyecto, string psUbicacionProyecto, 
+    string psTipoComprobacion, string psClvConcepto, 
+    string psDescripcionConcepto, string psPdf, string psImporte, 
+    string psXml, string psMetPago, string psMetPagoUsser, 
+    string psObservaciones, string psDocumento, string psTicket, 
+    string psUUID, string psPeriodo, string psVersion = "")
+{
+    Boolean lbResultado;
+    string lsHoy = clsFunciones.FormatFecha(DateTime.Today.ToString());
+
+    string Query = "INSERT INTO `crip_comision_comprobacion` ";
+    Query += "(";
+    Query += " NO_OFICIO, CLAVE_OFICIO, COMISIONADO,";
+    Query += " DEP_COMSIONADO, FECHA_AUTORIZA, FECHA_COMPROBACION,";
+    Query += " FECHA_VOBO, FECHA_FACTURA, SEC_EFF, CLV_PROY,";
+    Query += " CLV_DEP_PROY, TIPO_COMPROBANTE, CONCEPTO,";
+    Query += " DESCRIPCION, COMPROBANTE, IMPORTE, `XML`,";
+    Query += " METODO_PAGO_FACTURA, METODO_PAGO_USUARIO,";
+    Query += " OBSERVACIONES, CLV_DOC, DOCUMENTO_COMPROBACION,";
+    Query += " TICKET, ESTATUS, ANIO, VERSION_CFDI";
+    Query += ") VALUES (";
+    Query += " '" + psOficio + "', ";
+    Query += " '" + psClvOficio + "', ";
+    Query += " '" + psComisionado + "', ";
+    Query += " '" + psUbicacionComisionado + "', ";
+    Query += " '1900-01-01', ";  // FECHA_NULA constant
+    Query += " '" + lsHoy + "', ";
+    Query += " '1900-01-01', ";
+    Query += " '" + psFechaFactura + "', ";
+    
+    // Get next sequence number
+    Query += " '" + MngDatosComision.Obtiene_Max_Comprobacion(
+        psOficio, psClvOficio, psComisionado, psUbicacionComisionado, 
+        psProyecto, psUbicacionProyecto) + "', ";
+    
+    Query += " '" + psProyecto + "', ";
+    Query += " '" + psUbicacionProyecto + "', ";
+    Query += " '" + psTipoComprobacion + "', ";
+    Query += " '" + psClvConcepto + "', ";
+    Query += " '" + psDescripcionConcepto + "', ";
+    Query += " '" + psPdf + "', ";
+    Query += " '" + psImporte + "', ";
+    Query += " '" + psXml + "', ";
+    Query += " '" + psMetPago + "', ";
+    Query += " '" + psMetPagoUsser + "', ";
+    Query += " '" + psObservaciones + "', ";
+    Query += " '" + psUUID + "', ";
+    Query += " '" + psDocumento + "', ";
+    Query += " '" + psTicket + "', ";
+    Query += " '1', ";
+    Query += " '" + psPeriodo + "', ";
+    Query += " '" + psVersion + "'";
+    Query += ")";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+
+    if (cmd.ExecuteNonQuery() == 1)
+    {
+        lbResultado = true;
+    }
+    else
+    {
+        lbResultado = false;
+    }
+    
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return lbResultado;
+}
+```
+
+<Warning>
+**Auto-increment vs. Manual Sequences:**
+
+SMAF uses **manual sequence generation** for many tables instead of AUTO_INCREMENT. The `Obtiene_Max_*` methods query for `MAX(field) + 1` to generate the next ID. This approach can lead to race conditions in high-concurrency scenarios.
+</Warning>
+
+### Sequence Number Generation
+
+```csharp
+public static string Obtiene_Max_Comprobacion(
+    string psOficio, string psClvOficio, string psComisionado, 
+    string psUbicacionComisionado, string psProyecto, 
+    string psubicacionProy)
+{
+    string Query = "SELECT MAX(SEC_EFF) AS MAX ";
+    Query += "FROM crip_comision_comprobacion ";
+    Query += "WHERE NO_OFICIO = '" + psOficio + "' ";
+    Query += "AND COMISIONADO = '" + psComisionado + "' ";
+    Query += "AND DEP_COMSIONADO = '" + psUbicacionComisionado + "' ";
+    Query += "AND CLV_PROY = '" + psProyecto + "' ";
+    Query += "AND CLV_DEP_PROY = '" + psubicacionProy + "' ";
+    Query += "AND CLAVE_OFICIO = '" + psClvOficio + "'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+
+    string max;
+    int liNumero;
+
+    if (Reader.Read())
+    {
+        max = Convert.ToString(Reader["MAX"]);
+        
+        if (max == "")
+        {
+            max = "0";
+        }
+        
+        liNumero = Convert.ToInt32(max) + 1;
+    }
+    else
+    {
+        liNumero = 1;
+    }
+
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    
+    return Convert.ToString(liNumero);
+}
+```
+
+## Update Operations
+
+### Basic Update Pattern
+
+```csharp
+public static Boolean Update_ActualizaDatosUser(Usuario poUsuario, 
+                                                 string psUsuario)
+{
+    Boolean Resultado = false;
+
+    string lsQuery = "UPDATE crip_usuarios SET ";
+    lsQuery += "NOMBRE = '" + poUsuario.Nombre + "', ";
+    lsQuery += "AP_PAT = '" + poUsuario.ApPat + "', ";
+    lsQuery += "AP_MAT = '" + poUsuario.ApMat + "', ";
+    lsQuery += "FECH_NAC = '" + clsFunciones.FormatFecha(poUsuario.fech_nac) + "', ";
+    lsQuery += "CALLE = '" + poUsuario.calle + "', ";
+    lsQuery += "NUM_EXT = '" + poUsuario.numext + "', ";
+    lsQuery += "NUM_INT = '" + poUsuario.num_int + "', ";
+    lsQuery += "COLONIA = '" + poUsuario.colonia + "', ";
+    lsQuery += "DELEGACION = '" + poUsuario.delegacion + "', ";
+    lsQuery += "CD = '" + poUsuario.CD + "', ";
+    lsQuery += "CLV_ESTADO = '" + poUsuario.Estado + "', ";
+    lsQuery += "RFC = '" + poUsuario.RFC + "', ";
+    lsQuery += "CURP = '" + poUsuario.CURP + "', ";
+    lsQuery += "EMAIL = '" + poUsuario.Email + "', ";
+    lsQuery += "FECHEFF = '" + clsFunciones.FormatFecha(
+        Convert.ToString(DateTime.Today)) + "' ";
+    lsQuery += "WHERE USUARIO = '" + psUsuario + "' ";
+    lsQuery += "AND ESTATUS = '1'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(lsQuery, ConexionMysql);
+    cmd.Connection.Open();
+    
+    if (cmd.ExecuteNonQuery() == 1)
+    {
+        Resultado = true;
+    }
+    else
+    {
+        Resultado = false;
+    }
+
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return Resultado;
+}
+```
+
+**Update conventions:**
+- Always update `FECHEFF` (effective date) field
+- Include `ESTATUS = '1'` in WHERE clause (active records only)
+- Return false if no rows were updated
+- Entity object provides values, but query builds SQL
+
+### Conditional Update
+
+```csharp
+public static Boolean Update_ruta_Comision(string psRuta, string psArchivo, 
+    string psDep, string psComisionado, string psOficio, 
+    Comision poComision)
+{
+    bool bandera = false;
+    
+    string query = "UPDATE crip_comision ";
+    query += "SET RUTA = '" + psRuta + "', ";
+    query += "ARCHIVO = '" + psArchivo + "' ";
+    query += "WHERE CLV_DEP_COM = '" + psDep + "' ";
+    query += "AND USUARIO = '" + psComisionado + "' ";
+
+    // Conditional status based on business rules
+    if ((poComision.Zona_Comercial == "0") && 
+        (IsNullOrZero(poComision.Combustible_Efectivo)) &&
+        (IsNullOrZero(poComision.Peaje)) && 
+        (IsNullOrZero(poComision.Pasaje)))
+    {
+        query += "AND ESTATUS = '5'";  // Validated
+    }
+    else if ((poComision.Zona_Comercial == "15") && 
+             (IsNullOrZero(poComision.Combustible_Efectivo)) &&
+             (IsNullOrZero(poComision.Peaje)) && 
+             (IsNullOrZero(poComision.Pasaje)))
+    {
+        query += "AND ESTATUS = '5'";
+    }
+    else
+    {
+        query += "AND ESTATUS = '9'";  // Paid
+    }
+
+    query += " AND NO_OFICIO = '" + psOficio + "'";
+    query += " AND PERIODO = '" + poComision.Periodo + "'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(query, ConexionMysql);
+    cmd.Connection.Open();
+
+    if (cmd.ExecuteNonQuery() == 1) 
+        bandera = true;
+    else 
+        bandera = false;
+
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return bandera;
+}
+```
+
+## DataTable and DataSet Usage
+
+While most SMAF DAL methods use `MySqlDataReader` for performance, some scenarios use `DataTable` or `DataSet`:
+
+### DataTable Pattern
+
+```csharp
+public static DataTable ObtenerReporte(string psPeriodo, string psUbicacion)
+{
+    string Query = "SELECT * FROM vw_reporte ";
+    Query += "WHERE PERIODO = '" + psPeriodo + "' ";
+    Query += "AND UBICACION = '" + psUbicacion + "'";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlDataAdapter adapter = new MySqlDataAdapter(Query, ConexionMysql);
+    DataTable dt = new DataTable();
+    
+    ConexionMysql.Open();
+    adapter.Fill(dt);
+    
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return dt;
+}
+```
+
+**When to use DataTable:**
+- Binding directly to grid controls
+- Exporting to Excel/PDF
+- Need for disconnected data manipulation
+- Multiple result sets (use `DataSet`)
+
+## Transaction Management
+
+### Current Implementation
+
+SMAF's DAL **does not currently implement explicit transactions**. Each operation executes in its own implicit transaction:
+
+```csharp
+// Each operation commits independently
+Bool success1 = MngDatosComision.Inserta_Comision(comision);
+Bool success2 = MngDatosItinerario.Inserta_Itinerario(itinerario);
+Bool success3 = MngDatosViaticos.Calcula_Viaticos(comision);
+
+// No rollback if later operations fail
+```
+
+### Recommended Transaction Pattern
+
+For operations requiring atomicity, implement transactions:
+
+```csharp
+public static Boolean Inserta_Comision_Completa(Comision comision)
+{
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    ConexionMysql.Open();
+    MySqlTransaction transaction = ConexionMysql.BeginTransaction();
+    
+    try
+    {
+        // Step 1: Insert commission
+        MySqlCommand cmd1 = new MySqlCommand(queryComision, ConexionMysql);
+        cmd1.Transaction = transaction;
+        cmd1.ExecuteNonQuery();
+        
+        // Step 2: Insert itinerary
+        MySqlCommand cmd2 = new MySqlCommand(queryItinerario, ConexionMysql);
+        cmd2.Transaction = transaction;
+        cmd2.ExecuteNonQuery();
+        
+        // Step 3: Calculate allowances
+        MySqlCommand cmd3 = new MySqlCommand(queryViaticos, ConexionMysql);
+        cmd3.Transaction = transaction;
+        cmd3.ExecuteNonQuery();
+        
+        // All succeeded - commit
+        transaction.Commit();
+        MngConexion.disposeConexionSMAF(ConexionMysql);
+        return true;
+    }
+    catch (Exception ex)
+    {
+        // Any failure - rollback all
+        transaction.Rollback();
+        MngConexion.disposeConexionSMAF(ConexionMysql);
+        return false;
+    }
+}
+```
+
+<Note>
+**Transaction Guidelines:**
+
+- Use transactions when multiple related operations must succeed together
+- Keep transaction scope as small as possible
+- Always include try-catch with rollback
+- Dispose connection after commit or rollback
+</Note>
+
+## Parameterized Queries
+
+### Current Implementation
+
+SMAF primarily uses **string concatenation** for query construction:
+
+```csharp
+// Current pattern - string concatenation
+string Query = "SELECT * FROM users ";
+Query += "WHERE username = '" + psUsername + "' ";
+Query += "AND password = '" + psPassword + "'";
+```
+
+<Warning>
+**Security Consideration:**
+
+String concatenation is vulnerable to SQL injection. While existing code follows this pattern, **new development should use parameterized queries**.
+</Warning>
+
+### Recommended Parameterized Pattern
+
+```csharp
+public static Usuario Login(string username, string password)
+{
+    string Query = "SELECT * FROM users ";
+    Query += "WHERE username = @username AND password = @password";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    
+    // Add parameters instead of concatenation
+    cmd.Parameters.AddWithValue("@username", username);
+    cmd.Parameters.AddWithValue("@password", password);
+    
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+    
+    Usuario user = new Usuario();
+    
+    if (Reader.Read())
+    {
+        user.Username = Convert.ToString(Reader["username"]);
+        user.Email = Convert.ToString(Reader["email"]);
+    }
+    
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return user;
+}
+```
+
+## Common Data Patterns
+
+### Dropdown/Catalog Lists
+
+```csharp
+public static List<Entidad> Obtiene_Tipo_Comision()
+{
+    string query = "SELECT CLV_TIPO_COMISION AS CODIGO, ";
+    query += "DESCRIPCION AS DESCRIPCION ";
+    query += "FROM crip_comision_tipo ";
+    query += "WHERE ESTATUS = '1'";
+
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader reader = cmd.ExecuteReader();
+    
+    List<Entidad> ListGrid = new List<Entidad>();
+    
+    while (reader.Read())
+    {
+        Entidad objetoEntidad = new Entidad();
+        objetoEntidad.Codigo = Convert.ToString(reader["CODIGO"]);
+        objetoEntidad.Descripcion = Convert.ToString(reader["DESCRIPCION"]);
+        ListGrid.Add(objetoEntidad);
+    }
+    
+    reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    return ListGrid;
+}
+```
+
+### Existence Checks
+
+```csharp
+public static bool ExisteComision(string folio, string ubicacion)
+{
+    string Query = "SELECT COUNT(*) AS TOTAL ";
+    Query += "FROM crip_comision ";
+    Query += "WHERE FOLIO = '" + folio + "' ";
+    Query += "AND CLV_DEP = '" + ubicacion + "'";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+    
+    int count = 0;
+    
+    if (Reader.Read())
+    {
+        count = Convert.ToInt32(Reader["TOTAL"]);
+    }
+    
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);
+    
+    return count > 0;
+}
+```
+
+## Best Practices Summary
+
+<Note>
+**DAL Operation Checklist:**
+
+✓ **Always** close `MySqlDataReader` before disposing connection
+
+✓ **Always** call `disposeConexionSMAF()` after operations
+
+✓ Return empty collections/objects instead of null for failed queries
+
+✓ Use `Convert.ToString()` for all DataReader field access
+
+✓ Format dates with `clsFunciones.FormatFecha()`
+
+✓ Check `ExecuteNonQuery() == 1` for single-row operations
+
+✓ Provide default "SELECCIONE" options for dropdown lists
+
+✓ Include `ESTATUS = '1'` filters for active records
+
+✓ Update `FECHEFF` timestamp on all modifications
+
+✓ Consider transactions for multi-step operations
+</Note>
+
+## Related Documentation
+
+- [Database Connection Management](/technical/dal/database-connection)
+- [DAL Overview](/technical/dal/overview)
+- [Business Entities](/technical/architecture/entities)

@@ -1,0 +1,393 @@
+---
+title: 'Ministraciones - Overview'
+description: 'Introduction to fund allocations for travel expenses in SMAF'
+---
+
+# Fund Allocations (Ministraciones) Overview
+
+Ministraciones are fund allocations that manage and track budgeted resources for travel expenses in SMAF. They serve as the financial control mechanism linking approved travel assignments with actual payments disbursed to employees.
+
+## What is a Ministracion?
+
+A ministracion is a budget allocation record that:
+
+- **Groups payments** for one or more travel assignments
+- **Tracks budget consumption** against allocated funds
+- **Links to accounting systems** through budget partition codes (partidas presupuestales)
+- **Maintains payment history** with dates, amounts, and bank references
+- **Requires approval** from financial administrators before disbursement
+
+## Purpose and Benefits
+
+### Budget Control
+
+Ministraciones provide centralized budget tracking:
+
+```csharp
+bool insert = MngNegocioMinistracion.Inserta_MInistracionDetalle(
+    dplTipoMinistracion.SelectedValue.ToString(), 
+    lsMinistracion, 
+    lsHoy, 
+    Year, 
+    Session["Crip_Usuario"].ToString(), 
+    Session["Crip_Ubicacion"].ToString(), 
+    Dictionary.FECHA_NULA, 
+    MngNegocioDependencia.Obtiene_DIrector_Financieros(
+        Dictionary.PUESTO_FINANCIERO, Dictionary.SUBDIRECTOR_ADJUNTO), 
+    Dictionary.FECHA_NULA, 
+    MngNegocioDependencia.Obtiene_DIrector_Financieros(
+        Dictionary.PUESTO_FINANCIERO, Dictionary.SUBDIRECTOR_ADJUNTO), 
+    "VIATICOS NACIONALES PARA LABORES EN CAMPO Y DE SUPERVISION",
+    clsFuncionesGral.ConvertString(
+        clsFuncionesGral.Convert_Double(DetalleComision.Total_Viaticos) + 
+        clsFuncionesGral.Convert_Double(DetalleComision.Combustible_Efectivo) + 
+        clsFuncionesGral.Convert_Double(DetalleComision.Peaje) + 
+        clsFuncionesGral.Convert_Double(DetalleComision.Pasaje)
+    ), 
+    "0", 
+    "1", 
+    "1", 
+    lsHoy, 
+    MngNegocioMinistracion.Obtiene_ClvPeriodo(lsHoy, Year)
+);
+```
+
+### Financial Transparency
+
+Each ministracion maintains:
+- Period key (`Clave_Periodo`) for fiscal tracking
+- Generation date and user
+- Authorization dates and approvers
+- Detailed concept descriptions
+- Complete bank transaction details
+
+### Audit Trail
+
+The system creates comprehensive audit records:
+
+```csharp
+Ministracion oMinistracion = MngNegocioMinistracion.Objeto_Ministracion(
+    txtArchivoHiden.Text, 
+    dplMinistracion.SelectedValue.ToString(), 
+    "17"
+);
+
+// Track amounts
+// - Total_Solicitado: Requested amount
+// - Total_Pagado: Amount paid to date
+// - Secuencia: Payment sequence number
+```
+
+## Ministracion Types
+
+The system supports different types of ministraciones based on payment purpose:
+
+```csharp
+dplTipoMinistracion.DataSource = 
+    MngNegocioMinistracion.ListaTipoMinistracion("00");
+dplTipoMinistracion.DataValueField = Dictionary.CODIGO;
+dplTipoMinistracion.DataTextField = Dictionary.DESCRIPCION;
+dplTipoMinistracion.DataBind();
+```
+
+### Common Ministracion Types
+
+<Accordion title="Travel Payments (Viáticos)">
+  Fund allocations for travel allowances, including:
+  - Daily per diem
+  - Meal allowances
+  - Incidental expenses
+  - Overnight stays
+  
+  **Code**: Type varies by program and budget source
+</Accordion>
+
+<Accordion title="Provider Payments (Proveedores)">
+  Allocations for vendor invoices related to travel:
+  - Hotel accommodations (when direct payment required)
+  - Transportation services
+  - Event registrations
+  - Conference fees
+  
+  Requires CFDI (digital tax receipt) validation
+</Accordion>
+
+<Accordion title="Reimbursements">
+  Fund allocations for post-travel expense reimbursements:
+  - Additional approved expenses
+  - Receipted costs exceeding original allocation
+  - Emergency travel expenses
+</Accordion>
+
+## Timing and Creation
+
+### When Ministraciones are Created
+
+<Steps>
+  <Step title="Travel Assignment Approved">
+    After a comisión receives all required approvals
+  </Step>
+  
+  <Step title="Financial Review Complete">
+    Budget availability confirmed by financial administrators
+  </Step>
+  
+  <Step title="Payment Processing Initiated">
+    When the payment module is accessed for the commission
+  </Step>
+  
+  <Step title="First Payment Registration">
+    System creates ministracion when registering initial payment
+  </Step>
+</Steps>
+
+### Automatic vs. Manual Creation
+
+**Automatic Creation**: When processing first payment for a commission
+
+```csharp
+if (Session["Crip_IsExistinMinistracion"].ToString() == "0")
+{
+    // Generate new ministracion number
+    lsMinistracion = MngNegocioMinistracion.Obtiene_Max_Ministracion();
+    
+    // Create ministracion detail record
+    bool insert = MngNegocioMinistracion.Inserta_MInistracionDetalle(...);
+}
+```
+
+**Manual Creation**: Through the Alta_Ministracion module for provider payments
+
+```csharp
+Label1.Text = clsFuncionesGral.ConvertMayus("Alta de Ministraciones :");
+Label6.Text = clsFuncionesGral.ConvertMayus("Tipo MInistracion  : ");
+```
+
+## Budget Tracking Components
+
+### Total Amounts
+
+<ParamField path="Total_Solicitado" type="decimal">
+  Total amount requested/allocated for the ministracion
+</ParamField>
+
+<ParamField path="Total_Pagado" type="decimal">
+  Cumulative amount paid through all payment sequences
+</ParamField>
+
+<ParamField path="Subtotal" type="decimal">
+  Base amount before taxes and deductions
+</ParamField>
+
+### Tax Components
+
+<ParamField path="IVA" type="decimal">
+  Value Added Tax (16% in Mexico)
+</ParamField>
+
+<ParamField path="IVA_Retenido" type="decimal">
+  Withheld VAT (when applicable)
+</ParamField>
+
+<ParamField path="ISR" type="decimal">
+  Income Tax amount
+</ParamField>
+
+<ParamField path="ISR_Retenido" type="decimal">
+  Withheld Income Tax
+</ParamField>
+
+### Other Deductions
+
+<ParamField path="TUA" type="decimal">
+  Airport Use Tax (for air travel)
+</ParamField>
+
+<ParamField path="SFP" type="decimal">
+  Special federal tax
+</ParamField>
+
+<ParamField path="Descuentos" type="decimal">
+  Other discounts or deductions
+</ParamField>
+
+## Status Tracking
+
+Ministraciones track financial status through multiple fields:
+
+```csharp
+if (clsFuncionesGral.Convert_Double(oMinistracion.Total_Solicitado) == viat)
+{
+    lsEstatusFinancieros = "2"; // Fully paid
+}
+else
+{
+    lsEstatusFinancieros = "1"; // Partial payment
+}
+```
+
+### Status Codes
+
+| Code | Status | Description |
+|------|--------|-------------|
+| "0" | Pending | Ministracion created, no payments yet |
+| "1" | Partial | Some payments made, balance remaining |
+| "2" | Complete | Fully paid, no balance remaining |
+
+<Note>
+Status updates automatically when payments are registered through the payment module.
+</Note>
+
+## Approval Workflow
+
+Ministraciones require approval before funds can be disbursed:
+
+```csharp
+MngNegocioDependencia.Obtiene_DIrector_Financieros(
+    Dictionary.PUESTO_FINANCIERO, 
+    Dictionary.SUBDIRECTOR_ADJUNTO
+)
+```
+
+### Approval Stages
+
+1. **Created by**: Administrative or center user
+2. **Reviewed by**: Financial department
+3. **Authorized by**: Deputy Financial Director
+4. **Final approval**: Financial Director (for amounts exceeding threshold)
+
+### Approval Fields
+
+<ParamField path="Fecha_Autoriza" type="date">
+  Date when ministracion was authorized
+</ParamField>
+
+<ParamField path="Autoriza" type="string">
+  User ID of authorizing official
+</ParamField>
+
+<ParamField path="Usuario_Genera" type="string">
+  User ID who created the ministracion
+</ParamField>
+
+## Integration with Payments
+
+Ministraciones link to payments through the payment registration process:
+
+### Checking for Existing Ministracion
+
+```csharp
+List<Entidad> ListaMinistracion = 
+    MngNegocioMinistracion.Obtiene_Ministracion(Year, txtArchivoHiden.Text);
+
+if (ListaMinistracion.Count > 0)
+{
+    // Existing ministracion found - can add to it
+    dplMinistracion.DataSource = ListaMinistracion;
+    dplMinistracion.DataTextField = Dictionary.DESCRIPCION;
+    dplMinistracion.DataValueField = Dictionary.CODIGO;
+    dplMinistracion.DataBind();
+    Session["Crip_IsExistinMinistracion"] = "1";
+}
+else
+{
+    // No existing ministracion - will create new one
+    clsFuncionesGral.Llena_Lista(dplMinistracion, 
+        clsFuncionesGral.ConvertMayus(
+            " = s e l e c c i o n e= |Nueva Ministracion"));
+    Session["Crip_IsExistinMinistracion"] = "0";
+}
+```
+
+### Linking Payment Categories
+
+```csharp
+List<Entidad> lista = 
+    MngNegocioMinistracion.ListaMinistracionesSolicitadas(
+        txtArchivoHiden.Text, 
+        dplMinistracion.SelectedValue.ToString()
+    );
+
+foreach (Entidad ent in lista)
+{
+    if (ent.Codigo == "17") // Viáticos
+    {
+        clsFuncionesGral.Activa_Paneles(pnlViaticos, true);
+    }
+    if (ent.Codigo == "6") // Combustible
+    {
+        clsFuncionesGral.Activa_Paneles(pnlCombustible, true);
+    }
+    // Additional categories...
+}
+```
+
+## Period Management
+
+Ministraciones are organized by fiscal periods:
+
+```csharp
+MngNegocioMinistracion.Obtiene_ClvPeriodo(lsHoy, Year)
+```
+
+This enables:
+- Monthly/quarterly budget reporting
+- Fiscal year reconciliation
+- Period-over-period analysis
+- Budget variance tracking
+
+<Warning>
+Ministraciones cannot span multiple fiscal years. Year-end processing requires special handling.
+</Warning>
+
+## Bank Account Information
+
+Each ministracion tracks both source and destination banking details:
+
+### Source Account (Origin)
+
+```csharp
+dplBancoOrigen.DataSource = 
+    MngNegocioCuentas.ListaBancos(Session["Crip_Ubicacion"].ToString());
+dplBancoOrigen.DataValueField = Dictionary.CODIGO;
+dplBancoOrigen.DataTextField = Dictionary.DESCRIPCION;
+dplBancoOrigen.DataBind();
+```
+
+<ParamField path="Banco_Origen" type="string">
+  Name of source bank account
+</ParamField>
+
+<ParamField path="Cuenta_Origen" type="string">
+  Source account number
+</ParamField>
+
+<ParamField path="Clabe_Origen" type="string">
+  Source CLABE interbank code
+</ParamField>
+
+### Destination Account
+
+<ParamField path="Banco" type="string">
+  Destination bank (employee or vendor)
+</ParamField>
+
+<ParamField path="Cuenta" type="string">
+  Destination account number
+</ParamField>
+
+<ParamField path="Clabe" type="string">
+  Destination CLABE code
+</ParamField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Fund Allocation" icon="plus" href="/ministraciones/fund-allocation">
+    Learn how to create and manage ministraciones
+  </Card>
+  
+  <Card title="Payment Processing" icon="money-bill-transfer" href="/pagos/payment-processing">
+    Process payments using ministraciones
+  </Card>
+</CardGroup>

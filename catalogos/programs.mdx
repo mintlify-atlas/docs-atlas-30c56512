@@ -1,0 +1,595 @@
+---
+title: 'Program Catalog Management'
+description: 'Creating and managing federal program catalogs in SMAF'
+---
+
+## Overview
+
+The Program Catalog (Alta de Programas) enables high-level administrators to create and manage federal programs that serve as the foundation for project assignments and budget tracking. Programs represent the federal government's research and administrative initiatives within INAPESCA.
+
+<Note>
+Program creation is restricted to Director General, Director de Administración, and Director Adjunto roles. Jefes de Centro can only assign existing programs to their units.
+</Note>
+
+## Program Structure
+
+Programs in SMAF follow the federal budget structure:
+
+```
+Componente (Component)
+└── Programa (Program)
+    └── Proyecto (Project)
+        └── Partida Presupuestal (Budget Item)
+```
+
+### Program Hierarchy
+
+<Steps>
+  <Step title="Component Level">
+    Represents major programmatic areas aligned with federal objectives (e.g., "Investigación Pesquera", "Acuacultura").
+  </Step>
+  
+  <Step title="Program Level">
+    Specific initiatives within a component with defined objectives and budget allocations.
+  </Step>
+  
+  <Step title="Project Level">
+    Operational assignments of programs to administrative units (CRIPs or Direcciones).
+  </Step>
+</Steps>
+
+## Accessing Program Management
+
+Navigate to **Catálogos > Alta de Programas** in the main menu.
+
+### Role-Based Access
+
+| Role | Capabilities |
+|------|-------------|
+| Director General | Create global programs for all directorates |
+| Director de Administración | Create global programs for all directorates |
+| Director Adjunto | Create programs within own directorate |
+| Jefe de Centro | Assign existing programs to local projects (read-only for catalog) |
+
+## Creating Programs
+
+### Director General Workflow
+
+<Steps>
+  <Step title="Select Directorate">
+    Choose the directorate (Dirección Adjunta) that will own this program.
+    
+    ```csharp
+    dplDireccion.DataSource = MngNegocioDirecciones.ObtienenDirecciones(Year, true);
+    dplDireccion.DataValueField = "Codigo";
+    dplDireccion.DataTextField = "Descripcion";
+    dplDireccion.DataBind();
+    ```
+  </Step>
+  
+  <Step title="Select Component">
+    Choose the component number that classifies this program.
+    
+    ```csharp
+    dplComponente.DataSource = MngNegocioComponente.Obtienencomponente();
+    dplComponente.DataValueField = "Codigo";
+    dplComponente.DataTextField = "Descripcion";
+    dplComponente.DataBind();
+    ```
+  </Step>
+  
+  <Step title="Enter Program Details">
+    Fill in the required fields:
+    - **Descripción**: Full program name
+    - **Descripción Corta**: Abbreviated name for reports
+    - **Objetivo**: Program objective and scope
+  </Step>
+  
+  <Step title="Assign Coordinator">
+    Enter the name of the program coordinator. For Director General, this is a free-text field.
+    
+    ```csharp
+    txtCoordinador.Visible = true;
+    dplCoordinador.Visible = false;
+    ```
+  </Step>
+  
+  <Step title="Set Global Budget">
+    Enter the total program budget (Presupuesto Global).
+    
+    ```csharp
+    lspresupuestototal = PrpTotal.Text;
+    
+    // Validation
+    if (!clsFuncionesGral.IsNumeric(lspresupuestototal))
+    {
+        Bandera = false;
+    }
+    ```
+  </Step>
+  
+  <Step title="Optional: Add Local Budget">
+    Check "Agregar presupuesto local" if this program has a separate local budget component.
+    
+    ```csharp
+    if (chkLocal.Checked)
+    {
+        clsFuncionesGral.Activa_Paneles(pnlPresupuestoLocal, true);
+    }
+    ```
+  </Step>
+  
+  <Step title="Save Program">
+    Click **Agregar** to save the program.
+  </Step>
+</Steps>
+
+### Director Adjunto Workflow
+
+Director Adjunto users have a modified workflow:
+
+<Steps>
+  <Step title="Select User Type">
+    Choose whether coordinators will be local users or CRIP-based users.
+    
+    ```csharp
+    clsFuncionesGral.Llena_Lista(dplTipoUsuario, "= S E L E C C I O N E =|Usuarios Locales|Usuarios Crips");
+    ```
+    
+    - **Usuarios Locales**: Personnel in the directorate office
+    - **Usuarios Crips**: Personnel in regional research centers
+  </Step>
+  
+  <Step title="Select Component">
+    Choose the component (directorate is auto-selected based on user's assignment).
+  </Step>
+  
+  <Step title="If CRIP Users Selected">
+    Choose the specific CRIP (adscripción) to filter available coordinators.
+    
+    ```csharp
+    if (lsUbicacion == Dictionary.DGAIA)
+    {
+        dplAdscripcion.DataSource = MngNegocioAdscripcion.ObtieneAdscripcion();
+    }
+    else
+    {
+        dplAdscripcion.DataSource = MngNegocioAdscripcion.ObtieneAdscripcion(lsUbicacion);
+    }
+    ```
+  </Step>
+  
+  <Step title="Select Coordinator">
+    Choose from the filtered list of users.
+    
+    ```csharp
+    dplCoordinador.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+        lsAdscripcion, 
+        lsUsuario, 
+        lsRol, 
+        true
+    );
+    ```
+  </Step>
+  
+  <Step title="Complete Program Details">
+    Enter description, objective, and budget as above.
+  </Step>
+</Steps>
+
+### Jefe de Centro Workflow
+
+CRIP directors select from existing global programs:
+
+<Steps>
+  <Step title="Select Existing Program">
+    Choose from programs available to your directorate.
+    
+    ```csharp
+    dplProgramas.DataSource = MngNegociosProgramas.Obtiene_Programas_Direccion(lsUbicacion);
+    dplProgramas.DataValueField = "Codigo";
+    dplProgramas.DataTextField = "Descripcion";
+    dplProgramas.DataBind();
+    ```
+  </Step>
+  
+  <Step title="View Program Details">
+    Description, objective, and short description are auto-populated (read-only).
+    
+    ```csharp
+    Descripcion.Enabled = false;
+    DescripcionCorta.Enabled = false;
+    Objetivo.Enabled = false;
+    ```
+  </Step>
+  
+  <Step title="Select Local Coordinator">
+    Choose a coordinator from your CRIP's personnel.
+    
+    ```csharp
+    dplCoordinador.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+        lsUbicacion, 
+        lsUsuario, 
+        "", 
+        true
+    );
+    ```
+  </Step>
+  
+  <Step title="Set Annual Budget">
+    Enter the budget allocated to your CRIP for this program (Presupuesto Anual).
+  </Step>
+</Steps>
+
+## Program Codes
+
+Program codes are automatically generated:
+
+```csharp
+lsPrograma = MngNegociosProgramas.Obtiene_Max_Programa(lsdireccion);
+```
+
+### Code Structure
+
+```
+[Dirección]-[Sequence]
+```
+
+**Example:**
+- Dirección: `906` (DGAIA)
+- Sequence: `001` (first program for this directorate this year)
+- **Result**: `906-001`
+
+## Program Types
+
+Programs are classified by their scope:
+
+<ParamField path="Tipo" type="string">
+  Program type determines assignment flexibility.
+</ParamField>
+
+### Type Definitions
+
+| Type | Name | Description | Cross-Directorate |
+|------|------|-------------|-------------------|
+| 1 | Transversal | Can be used by any directorate/CRIP | Yes |
+| 2 | Directorate-Specific | Limited to parent directorate | No |
+| 3 | Local | Restricted to specific CRIP | No |
+
+### Type Assignment Logic
+
+The program type is determined based on where it can be assigned:
+
+```csharp
+// Check if program type allows cross-directorate assignment
+if (lsdireccion != MngNegocioDependencia.Obtiene_Direccion(lsAdscripcion))
+{
+    if ((oPrograma.Tipo == "2") || (oPrograma.Tipo == "3"))
+    {
+        // Error: Cannot assign across directorates
+        ClientScript.RegisterStartupScript(
+            this.GetType(), 
+            "Inapesca", 
+            "alert('EL PROGRAMA SELECCIONADO NO ES TRANSVERSAL');", 
+            true
+        );
+        return;
+    }
+}
+```
+
+## Required Fields
+
+All programs must have complete information:
+
+<AccordionGroup>
+  <Accordion title="Component (Componente)">
+    ```csharp
+    if (lsnumcomponente == "0")
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Cannot be zero or empty. Must reference a valid component from the federal catalog.
+  </Accordion>
+  
+  <Accordion title="Description (Descripción)">
+    ```csharp
+    if ((lsdescripcion == null) | (lsdescripcion == ""))
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Full program name is required. Automatically converted to uppercase.
+  </Accordion>
+  
+  <Accordion title="Short Description (Descripción Corta)">
+    ```csharp
+    if ((lsdescripcorta == null) | (lsdescripcorta == ""))
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Abbreviated name for use in reports and grids.
+  </Accordion>
+  
+  <Accordion title="Objective (Objetivo)">
+    ```csharp
+    if ((lsobjetivo == null) | (lsobjetivo == ""))
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Clear statement of program goals and expected outcomes.
+  </Accordion>
+  
+  <Accordion title="Coordinator (Coordinador)">
+    ```csharp
+    if ((lscoordinador == null) | (lscoordinador == ""))
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Responsible personnel for program oversight.
+  </Accordion>
+  
+  <Accordion title="Budget (Presupuesto)">
+    ```csharp
+    if ((lspresupuestototal == null) | (lspresupuestototal == ""))
+    {
+        Bandera = false;
+    }
+    
+    if (!clsFuncionesGral.IsNumeric(lspresupuestototal))
+    {
+        Bandera = false;
+    }
+    ```
+    
+    Must be numeric and non-negative.
+  </Accordion>
+</AccordionGroup>
+
+## Local Budget Component
+
+Programs can have dual budget allocations:
+
+### Global Budget
+The total federal allocation for the program across all units.
+
+### Local Budget
+A subset allocated specifically to the directorate's local operations.
+
+```csharp
+if (pnlPresupuestoLocal.Visible)
+{
+    Entidad ent = MngNegocioDependencia.Obtiene_Tipo_Region(lsdireccion);
+    
+    Resultado = MngNegocioProyecto.Inserta_Proyecto(
+        lsnumcomponente, 
+        lsPrograma,
+        lsdireccion, 
+        clsFuncionesGral.ConvertMayus(lsdescripcion), 
+        clsFuncionesGral.ConvertMayus(lsdescripcorta), 
+        lscoordinador, 
+        clsFuncionesGral.ConvertMayus(lsobjetivo), 
+        lsdireccion, 
+        ent.Descripcion, 
+        lsArea, 
+        lsPresupuestoLocal  // Local budget amount
+    );
+}
+```
+
+<Note>
+When a local budget is specified, the system automatically creates a local project assignment in addition to the global program entry.
+</Note>
+
+## Insert Operation
+
+The program insertion process:
+
+```csharp
+lsPrograma = MngNegociosProgramas.Obtiene_Max_Programa(lsdireccion);
+
+Resultado = MngNegociosProgramas.Insert_Programas(
+    lsnumcomponente,                              // Component code
+    lsPrograma,                                   // Auto-generated program code
+    clsFuncionesGral.ConvertMayus(lsdescripcion), // Description (uppercase)
+    clsFuncionesGral.ConvertMayus(lsdescripcorta),// Short desc (uppercase)
+    clsFuncionesGral.ConvertMayus(lsobjetivo),    // Objective (uppercase)
+    lscoordinador,                                // Coordinator user ID
+    lsdireccion,                                  // Parent directorate
+    lspresupuestototal                            // Total budget
+);
+
+if (Resultado) 
+    ClientScript.RegisterStartupScript(
+        this.GetType(), 
+        "Inapesca", 
+        "alert('SE HA AGREGADO EL PROGRAMA CORRECTAMENTE.');", 
+        true
+    );
+else
+{
+    ClientScript.RegisterStartupScript(
+        this.GetType(), 
+        "Inapesca", 
+        "alert('Ocurrio un error al insertar el programa favor de validar.');", 
+        true
+    );
+    return;
+}
+```
+
+## Data Validation
+
+### Field Validation
+
+All text fields are converted to uppercase and sanitized:
+
+```csharp
+lsdescripcion = clsFuncionesGral.ConvertMayus(Descripcion.Text);
+lsdescripcorta = clsFuncionesGral.ConvertMayus(DescripcionCorta.Text);
+lsobjetivo = clsFuncionesGral.ConvertMayus(Objetivo.Text);
+```
+
+### Special Character Removal
+
+Project descriptions have special characters removed:
+
+```csharp
+oPrograma.Descripcion = clsFuncionesGral.RemoveSpecialCharacters(lsProyecto);
+```
+
+### Budget Validation
+
+<Warning>
+Budget amounts must be numeric values. The system validates using:
+
+```csharp
+if (!clsFuncionesGral.IsNumeric(lspresupuestototal))
+{
+    Bandera = false;
+    alert('Todos los campos son obligatorios, presupuesto numerico.');
+}
+```
+</Warning>
+
+## Coordinator Selection
+
+### Auto-Assignment for Director General
+
+When a Director General selects a directorate, the coordinator is auto-populated:
+
+```csharp
+protected void dplDireccion_SelectedIndexChanged(object sender, EventArgs e)
+{
+    lsdireccion = dplDireccion.SelectedValue.ToString();
+    if (lsdireccion != "0")
+    {
+        Entidad obj = MngNegocioUsuarios.Datos_DirAdjunto(lsdireccion);
+        txtCoordinador.Text = obj.Descripcion;
+        lscoordinador = obj.Codigo;
+    }
+}
+```
+
+### Dynamic Loading for Director Adjunto
+
+```csharp
+// Load local users
+if (lstipo == "2")
+{
+    dplCoordinador.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+        lsUbicacion, 
+        lsUsuario, 
+        lsRol, 
+        true
+    );
+}
+// Load CRIP users based on selected unit
+else
+{
+    dplCoordinador.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+        lsAdscripcion,  // Selected CRIP
+        lsUsuario, 
+        lsRol, 
+        true
+    );
+}
+```
+
+## Clearing Form Data
+
+After successful insertion, the form resets:
+
+```csharp
+public void Limpia_Datos()
+{
+    txtCoordinador.Text = Dictionary.CADENA_NULA;
+    Descripcion.Text = Dictionary.CADENA_NULA;
+    DescripcionCorta.Text = Dictionary.CADENA_NULA;
+    dplTipoUsuario.SelectedIndex = 0;
+    dplCoordinador.Items.Clear();
+    PrpTotal.Text = Dictionary.CADENA_NULA;
+    Objetivo.Text = Dictionary.CADENA_NULA;
+    
+    lspresupuestototal = Dictionary.CADENA_NULA;
+    lsdescripcion = Dictionary.CADENA_NULA;
+    lsdescripcorta = Dictionary.CADENA_NULA;
+    lscoordinador = Dictionary.CADENA_NULA;
+    lsobjetivo = Dictionary.CADENA_NULA;
+    
+    clsFuncionesGral.Activa_Paneles(pnlPresupuestoLocal, false);
+    chkLocal.Checked = false;
+    dplComponente.SelectedIndex = 0;
+    dplAdscripcion.Items.Clear();
+    clsFuncionesGral.Activa_Paneles(pnlAdscripcion, false);
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Descriptive Names" icon="pen">
+    Use clear, standardized naming conventions that include the fiscal year and program area.
+  </Card>
+  <Card title="Accurate Budgets" icon="calculator">
+    Verify budget amounts against federal allocations before creating programs.
+  </Card>
+  <Card title="Transversal Planning" icon="network-wired">
+    Mark programs as transversal only if they genuinely require cross-directorate collaboration.
+  </Card>
+  <Card title="Coordinator Coordination" icon="user-check">
+    Confirm with designated coordinators before assigning them to programs.
+  </Card>
+</CardGroup>
+
+## Common Errors
+
+<AccordionGroup>
+  <Accordion title="Missing required fields">
+    **Error**: "Todos los campos son obligatorios, presupuesto numerico."
+    
+    **Solution**: Ensure all fields have values:
+    - Component is selected (not "0")
+    - Description, short description, and objective are filled
+    - Coordinator is selected or entered
+    - Budget is a valid numeric value
+  </Accordion>
+  
+  <Accordion title="Non-numeric budget">
+    **Error**: Budget validation fails
+    
+    **Solution**: Enter only numeric values with optional decimal points. Do not include currency symbols, commas, or text.
+  </Accordion>
+  
+  <Accordion title="Local budget without global budget">
+    **Error**: Local budget panel enabled but validation fails
+    
+    **Solution**: When adding local budget, you must also provide:
+    - Global budget amount
+    - Valid local budget amount (numeric)
+    - Both amounts must be greater than zero
+  </Accordion>
+</AccordionGroup>
+
+## Related Topics
+
+<CardGroup cols={3}>
+  <Card title="Projects" icon="folder-tree" href="/catalogos/projects">
+    Assign programs to CRIPs and directorates
+  </Card>
+  <Card title="Budget Items" icon="file-invoice-dollar" href="/catalogos/budget-items">
+    Link programs to federal budget classifications
+  </Card>
+  <Card title="Components" icon="layer-group" href="/catalogos/components">
+    Understand component-level organization
+  </Card>
+</CardGroup>

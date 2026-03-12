@@ -1,0 +1,612 @@
+---
+title: CFDI XML Invoice Validation
+description: Understanding and processing XML invoices for fiscal expense verification
+---
+
+CFDI (Comprobante Fiscal Digital por Internet) XML invoices are the foundation of fiscal expense verification in SMAF. This guide explains the XML structure, validation process, and SAT integration requirements.
+
+## What is CFDI XML?
+
+CFDI XML is the digital format required by SAT (Servicio de Administración Tributaria) for all fiscal transactions in Mexico. Each valid invoice must include:
+
+- **Digital stamp** (Timbre Fiscal Digital)
+- **UUID** (Folio Fiscal) - Unique universal identifier
+- **Structured tax information** (IVA, IEPS, ISR, etc.)
+- **Issuer and recipient details**
+- **Concept details** with amounts
+
+<Note>
+While XML upload is **optional** in SMAF's simplified workflow, the UUID and amount are **required** for validation against SAT records.
+</Note>
+
+## XML File Structure
+
+SMAF's XML parser reads the following key elements:
+
+### Core Elements
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante 
+    xmlns:cfdi="http://www.sat.gob.mx/cfd/4" 
+    Total="1500.00"
+    ...>
+    
+    <!-- Issuer Information -->
+    <cfdi:Emisor 
+        Rfc="ABC123456XYZ" 
+        Nombre="Proveedor SA de CV"
+        .../>
+    
+    <!-- Concepts/Items -->
+    <cfdi:Conceptos>
+        <cfdi:Concepto 
+            Descripcion="Hospedaje"
+            Importe="1293.10"
+            .../>
+    </cfdi:Conceptos>
+    
+    <!-- Tax Information -->
+    <cfdi:Impuestos 
+        TotalImpuestosTrasladados="206.90"
+        TotalImpuestosRetenidos="0.00">
+        <cfdi:Traslados>
+            <cfdi:Traslado 
+                Impuesto="IVA" 
+                Importe="206.90"/>
+        </cfdi:Traslados>
+    </cfdi:Impuestos>
+    
+    <!-- Digital Stamp -->
+    <cfdi:Complemento>
+        <tfd:TimbreFiscalDigital 
+            xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+            UUID="12345678-1234-1234-1234-123456789012"
+            FechaTimbrado="2024-03-15T14:30:00"
+            .../>
+    </cfdi:Complemento>
+    
+</cfdi:Comprobante>
+```
+
+## XML Parsing Logic
+
+SMAF uses an XmlTextReader to extract invoice data:
+
+```csharp ComprobacionSInXml.aspx.cs:248-457
+public void Lee_XMl(string psArchivo, List<Entidad> plEntidad, Xml poXml)
+{
+    XmlTextReader reader = new XmlTextReader(psArchivo);
+    
+    while (reader.Read())
+    {
+        switch (reader.Name)
+        {
+            case "cfdi:Comprobante":
+                if ((poXml.TOTAL == "") & (reader["total"] != null))
+                {
+                    poXml.TOTAL = reader["total"];
+                }
+                break;
+            
+            case "cfdi:Emisor":
+            case "Emisor":
+                if ((poXml.RFC_EMISOR == "") & (reader["rfc"] != null))
+                {
+                    poXml.RFC_EMISOR = reader["rfc"];
+                }
+                break;
+            
+            case "cfdi:Concepto":
+            case "Concepto":
+                if (reader["descripcion"] != null)
+                {
+                    Entidad obj = new Entidad();
+                    obj.Codigo = reader["importe"];
+                    obj.Descripcion = reader["descripcion"];
+                    plEntidad.Add(obj);
+                }
+                break;
+            
+            case "cfdi:Impuestos":
+            case "Impuestos":
+                if (reader["totalImpuestosTrasladados"] != null)
+                {
+                    poXml.TOTAL_IMPUESTOS_TRASLADADOS = 
+                        reader["totalImpuestosTrasladados"];
+                }
+                if (reader["totalImpuestosRetenidos"] != null)
+                {
+                    poXml.TOTAL_IMPUESTOS_RETENIDOS = 
+                        reader["totalImpuestosRetenidos"];
+                }
+                break;
+            
+            // ... (continued)
+        }
+    }
+}
+```
+
+### Extracting Tax Details
+
+The system reads transferred taxes (Traslados) and withheld taxes (Retenciones):
+
+```csharp ComprobacionSInXml.aspx.cs:315-375
+case "cfdi:Traslado":
+case "Traslado":
+    if (reader["impuesto"] != null)
+    {
+        // IVA (Value Added Tax)
+        if (reader["impuesto"] == "IVA")
+        {
+            poXml.IVA = reader["importe"];
+        }
+        
+        // IEPS (Special Tax on Production and Services)
+        if (reader["impuesto"] == "IEPS")
+        {
+            poXml.IEPS = reader["importe"];
+        }
+        
+        // TUA (Airport Use Tax)
+        if (reader["impuesto"] == "TUA")
+        {
+            poXml.TUA = reader["importe"];
+        }
+        
+        // ISR (Income Tax)
+        if (reader["impuesto"] == "ISR")
+        {
+            poXml.ISR = reader["importe"];
+        }
+        
+        // SFP (not commonly used)
+        if (reader["impuesto"] == "SFP")
+        {
+            poXml.SFP = reader["importe"];
+        }
+    }
+    break;
+
+case "cfdi:Retencion":
+case "Retencion":
+    // Similar logic for withheld taxes
+    if (reader["impuesto"] == "IVA")
+    {
+        poXml.IVA_RETENIDO = reader["importe"];
+    }
+    // ... etc
+    break;
+```
+
+### Extracting Digital Stamp (Timbre Fiscal)
+
+```csharp ComprobacionSInXml.aspx.cs:441-444
+case "tfd:TimbreFiscalDigital":
+    if ((poXml.TIMBRE_FISCAL == "") & (reader["UUID"] != null))
+    {
+        poXml.TIMBRE_FISCAL = reader["UUID"];
+    }
+    if ((poXml.FECHA_TIMBRADO == "") & (reader["FechaTimbrado"] != null))
+    {
+        poXml.FECHA_TIMBRADO = FormatFecha(reader["FechaTimbrado"]);
+    }
+    break;
+```
+
+### Local Taxes (State Level)
+
+Some states impose additional local taxes:
+
+```csharp ComprobacionSInXml.aspx.cs:446-453
+case "implocal:TrasladosLocales":
+case "TrasladosLocales":
+    if ((poXml.ISH == "0") & (reader["Importe"] != null))
+    {
+        poXml.ISH = reader["Importe"]; // State lodging tax
+    }
+    break;
+```
+
+## Simplified Workflow (Without XML)
+
+SMAF allows expense verification **without uploading XML files** by manually entering key data:
+
+<Steps>
+  <Step title="Upload PDF only">
+    Upload just the PDF version of the invoice
+  </Step>
+  
+  <Step title="Enter UUID manually">
+    Type the **Folio Fiscal** (UUID) from your invoice
+    
+    ```csharp ComprobacionSInXml.aspx.cs:476-480
+    if ((txtUUID.Text == "") | (txtUUID.Text == null))
+    {
+        ClientScript.RegisterStartupScript(
+            this.GetType(), "Inapesca", 
+            "alert('Folio Fiscal es necesario.');", true);
+        return;
+    }
+    ```
+  </Step>
+  
+  <Step title="Enter amount">
+    Type the total invoice amount
+    
+    ```csharp ComprobacionSInXml.aspx.cs:482-491
+    if ((txtImporteFac.Text == "") | (txtImporteFac.Text == null))
+    {
+        alert('Importe necesario');
+        return;
+    }
+    else if (!IsNumeric(txtImporteFac.Text))
+    {
+        alert('Importe debe ser numérico');
+        return;
+    }
+    ```
+  </Step>
+  
+  <Step title="Enter date">
+    Select the invoice date using the calendar control
+    
+    ```html ComprobacionSInXml.aspx:311-313
+    <asp:TextBox ID="TextBox1" runat="server" Width="60%"></asp:TextBox>
+    <cc1:CalendarExtender ID="TextBox1_CalendarExtender" 
+        TargetControlID="TextBox1" Format="yyyy-MM-dd"/>
+    ```
+  </Step>
+</Steps>
+
+<Note>
+This simplified approach trades automation for flexibility, making the system accessible even when XML files are unavailable or corrupted.
+</Note>
+
+## UUID Validation and Uniqueness
+
+The system enforces UUID uniqueness to prevent invoice reuse:
+
+```csharp ComprobacionSInXml.aspx.cs:558-586
+try
+{
+    // Check if UUID already exists in the system
+    string existe = MngNegocioComprobacion.Exist_UUUID(txtUUID.Text);
+    
+    if ((existe == "") | (existe == null))
+    {
+        // UUID is new - proceed with saving
+        Valida_Carpeta(detalleComision.Ruta, false, true);
+        
+        double totalImporteXml = Convert_Double(txtImporteFac.Text);
+        
+        // Save files
+        if (fuplXML.HasFile)
+        {
+            fuplXML.PostedFile.SaveAs(
+                Crip_Ruta + "/" + fuplXML.FileName);
+        }
+        fuplPDF.PostedFile.SaveAs(
+            Crip_Ruta + "/" + fuplPDF.FileName);
+        
+        // Insert verification record
+        sube = Inserta_Comprobacion_Comision(
+            Oficio, Archivo, Usuario, Ubicacion,
+            TextBox1.Text, // Invoice date
+            Proyecto, Dep_Proy,
+            dplFiscales.SelectedValue.ToString(), // "2" for fiscal
+            ClaveConcepto, Concepto,
+            fuplPDF.FileName, 
+            ConvertString(totalImporteXml),
+            fuplXML.FileName,
+            "01", "01", // Payment method codes
+            Observaciones,
+            NombreArchivo, 
+            "", // Ticket (for fuel)
+            txtUUID.Text, // UUID
+            Periodo
+        );
+        
+        // Reload display
+        Crear_Tabla();
+        Carga_Detalle(detalleComision);
+    }
+    else
+    {
+        // UUID already exists - reject
+        alert('La factura que intenta subir ya fue usada para ' +
+              'otra comprobación, favor de ingresar una válida');
+        return;
+    }
+}
+catch (Exception x)
+{
+    Console.Write(x.Message);
+}
+```
+
+## Tax Validation Rules
+
+When XML is provided, the system can validate:
+
+### IVA (Value Added Tax)
+
+Standard rate in Mexico: **16%**
+
+```csharp
+// Expected calculation:
+if (poXml.IVA != null)
+{
+    double subtotal = Convert_Double(poXml.TOTAL) - 
+                      Convert_Double(poXml.TOTAL_IMPUESTOS_TRASLADADOS);
+    double expectedIVA = subtotal * 0.16;
+    
+    // Validate within tolerance
+    if (Math.Abs(Convert_Double(poXml.IVA) - expectedIVA) > 0.50)
+    {
+        // Flag for review
+    }
+}
+```
+
+### IEPS (Special Production Tax)
+
+Applies to specific goods:
+- Gasoline: Variable rate
+- Alcohol: 26.5% - 53%
+- Tobacco: 160%
+
+```csharp
+if (poXml.IEPS != null && poXml.IEPS != "0")
+{
+    // IEPS present - flag for special review
+    // Rate varies by product category
+}
+```
+
+### ISR (Income Tax Withholding)
+
+For professional services:
+
+```csharp
+if (poXml.ISR_RETENIDO != null)
+{
+    // Typically 10% for professional fees
+    // Validate withholding is properly documented
+}
+```
+
+## File Upload Validation
+
+The system validates file types before processing:
+
+```csharp ComprobacionSInXml.aspx.cs:504-546
+bool xmlOK = false;
+bool fileOk = false;
+
+// Validate PDF
+if (!fuplPDF.HasFile)
+{
+    alert('Archivo pdf es necesario.');
+    return;
+}
+else
+{
+    String fileExtension = 
+        System.IO.Path.GetExtension(fuplPDF.FileName).ToLower();
+    String[] allowedExtensions = { ".pdf", ".PDF" };
+    
+    for (int i = 0; i < allowedExtensions.Length; i++)
+    {
+        if (fileExtension == allowedExtensions[i])
+        {
+            fileOk = true;
+        }
+    }
+}
+
+// Validate XML (optional)
+if (fuplXML.HasFile)
+{
+    String fileExtension1 = 
+        System.IO.Path.GetExtension(fuplXML.FileName).ToLower();
+    String[] allowedExtensions1 = { ".pdf", ".PDF", ".xml", ".XML" };
+    
+    for (int i = 0; i < allowedExtensions1.Length; i++)
+    {
+        if (fileExtension1 == allowedExtensions1[i])
+        {
+            xmlOK = true;
+        }
+    }
+}
+else {
+    xmlOK = true; // XML is optional
+}
+
+if ((fileOk) & (xmlOK))
+{
+    // Proceed with upload
+}
+else
+{
+    alert('Tipo de Archivo no válido.');
+    return;
+}
+```
+
+## File Storage Structure
+
+Uploaded files are organized by commission:
+
+```
+/Comprobaciones/
+    /Usuario_Ubicacion/
+        /Folio_Comision/
+            factura_001.pdf
+            factura_001.xml
+            factura_002.pdf
+            factura_002.xml
+            reintegro_baucher.pdf
+            peaje_atentanota.pdf
+```
+
+## XML Data Model
+
+The `Xml` entity stores parsed data:
+
+```csharp
+public class Xml
+{
+    public string TOTAL { get; set; }
+    public string RFC_EMISOR { get; set; }
+    public string CONCEPTO { get; set; }
+    
+    // Taxes
+    public string TOTAL_IMPUESTOS_TRASLADADOS { get; set; }
+    public string TOTAL_IMPUESTOS_RETENIDOS { get; set; }
+    public string IVA { get; set; }
+    public string IEPS { get; set; }
+    public string ISR { get; set; }
+    public string TUA { get; set; }
+    public string SFP { get; set; }
+    public string ISH { get; set; } // State tax
+    
+    // Withholdings
+    public string IVA_RETENIDO { get; set; }
+    public string IEPS_RETENIDO { get; set; }
+    public string ISR_RETENIDO { get; set; }
+    public string TUA_RETENIDO { get; set; }
+    public string SFP_RETENIDO { get; set; }
+    
+    // Stamp
+    public string TIMBRE_FISCAL { get; set; }
+    public string FECHA_TIMBRADO { get; set; }
+}
+```
+
+## SAT Integration (Future Enhancement)
+
+<Warning>
+Current implementation does **not** perform real-time SAT validation. UUID uniqueness is checked only within the SMAF database.
+</Warning>
+
+For enhanced validation, consider integrating with SAT web services:
+
+```csharp
+// Pseudocode for future SAT validation
+public bool ValidateUUID_WithSAT(string uuid, string rfcEmisor, string total)
+{
+    // Call SAT SOAP service
+    var satService = new SAT.ValidacionService();
+    var response = satService.Consulta(
+        uuid: uuid,
+        rfcEmisor: rfcEmisor,
+        rfcReceptor: "INSTITUCION_RFC",
+        total: total
+    );
+    
+    return response.Estado == "Vigente";
+}
+```
+
+## Common XML Issues
+
+<AccordionGroup>
+  <Accordion title="Missing Timbre Fiscal">
+    **Problem**: XML file doesn't contain `<tfd:TimbreFiscalDigital>`
+    
+    **Solution**: Request properly stamped CFDI from vendor. Unstamped invoices are not valid.
+  </Accordion>
+  
+  <Accordion title="Invalid RFC Format">
+    **Problem**: RFC (Tax ID) doesn't match expected format
+    
+    **Solution**: Verify RFC is 12 characters (moral) or 13 characters (física) with proper check digit
+  </Accordion>
+  
+  <Accordion title="Mismatched Totals">
+    **Problem**: Subtotal + IVA ≠ Total
+    
+    **Solution**: Check for rounding errors. SAT allows ±$0.50 tolerance
+  </Accordion>
+  
+  <Accordion title="Encoding Issues">
+    **Problem**: Special characters (ñ, á, é) appear corrupted
+    
+    **Solution**: Ensure XML is UTF-8 encoded:
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    ```
+  </Accordion>
+  
+  <Accordion title="Namespace Variations">
+    **Problem**: CFDI version 3.3 vs 4.0 have different namespaces
+    
+    **Solution**: Parser handles both `cfdi:` prefixed and unprefixed elements
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Verify UUID" icon="fingerprint">
+    Manually confirm the UUID from your paper/PDF invoice matches what you type
+  </Card>
+  
+  <Card title="Keep XML Copies" icon="copy">
+    Store XML files even if upload is optional - needed for audits
+  </Card>
+  
+  <Card title="Check Dates" icon="calendar">
+    Invoice date must fall within travel period (Fecha_Inicio to Fecha_Final)
+  </Card>
+  
+  <Card title="Validate Vendor RFC" icon="id-card">
+    Ensure vendor RFC is registered with SAT and active
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### UUID Already Exists
+
+```csharp
+if (existe != "" && existe != null)
+{
+    alert('La factura ya fue usada para otra comprobación');
+}
+```
+
+**Causes**:
+1. Vendor issued duplicate invoice
+2. Invoice was used in another employee's verification
+3. Database corruption
+
+**Resolution**:
+- Contact vendor for corrected invoice with new UUID
+- If legitimate duplicate, contact SMAF administrator
+
+### XML Parse Errors
+
+**Causes**:
+1. Malformed XML structure
+2. Missing required namespaces
+3. Invalid characters
+
+**Resolution**:
+- Validate XML against SAT schema: http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd
+- Use XML validator tools before upload
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Expense Verification" icon="clipboard-check" href="/comprobaciones/expense-verification">
+    Complete expense submission process
+  </Card>
+  
+  <Card title="International Travel" icon="globe" href="/comprobaciones/international-travel">
+    Special XML requirements for foreign vendors
+  </Card>
+</CardGroup>

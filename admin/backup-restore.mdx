@@ -1,0 +1,552 @@
+---
+title: Backup and Restore
+description: Database backup strategies, file system backups, and disaster recovery procedures for SMAF
+---
+
+## Overview
+
+SMAF requires comprehensive backup strategies covering both the MySQL database and the file system containing uploaded documents (XML files, PDFs, and images). This guide provides procedures for backup, restore, and disaster recovery operations.
+
+<Warning>
+Always test backup restoration procedures in a non-production environment before relying on them for disaster recovery.
+</Warning>
+
+## Database Backup
+
+### MySQL Database Structure
+
+SMAF uses MySQL (version 5.6.17+) with the following key databases:
+
+- **inapesca_cripsc** - Main SMAF database (commissions, payments, users)
+- **dgaipp** - DGAIPP module database
+- **contratos** - Contracts module database
+- **modulo_consulta** - Query module database
+
+### Automated Database Backup
+
+<Steps>
+
+<Step title="Configure MySQL backup script">
+Create a backup script at `/usr/local/bin/smaf-backup.sh`:
+
+```bash
+#!/bin/bash
+# SMAF MySQL Database Backup Script
+
+BACKUP_DIR="/var/backups/smaf/mysql"
+DATE=$(date +%Y%m%d_%H%M%S)
+RETENTION_DAYS=30
+
+# Database credentials
+DB_USER="backup_user"
+DB_PASS="your_secure_password"
+
+# Create backup directory
+mkdir -p $BACKUP_DIR
+
+# Backup main SMAF database
+mysqldump -u $DB_USER -p$DB_PASS \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --events \
+  inapesca_cripsc | gzip > $BACKUP_DIR/smaf_$DATE.sql.gz
+
+# Backup DGAIPP database
+mysqldump -u $DB_USER -p$DB_PASS \
+  --single-transaction \
+  dgaipp | gzip > $BACKUP_DIR/dgaipp_$DATE.sql.gz
+
+# Backup contracts database
+mysqldump -u $DB_USER -p$DB_PASS \
+  --single-transaction \
+  contratos | gzip > $BACKUP_DIR/contratos_$DATE.sql.gz
+
+# Remove old backups
+find $BACKUP_DIR -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete
+
+echo "Backup completed: $DATE"
+```
+</Step>
+
+<Step title="Set script permissions">
+```bash
+chmod 700 /usr/local/bin/smaf-backup.sh
+chown root:root /usr/local/bin/smaf-backup.sh
+```
+</Step>
+
+<Step title="Schedule automated backups">
+Add to crontab for daily backups at 2:00 AM:
+
+```bash
+crontab -e
+```
+
+Add the following line:
+
+```text
+0 2 * * * /usr/local/bin/smaf-backup.sh >> /var/log/smaf-backup.log 2>&1
+```
+</Step>
+
+</Steps>
+
+### Manual Database Backup
+
+For immediate backup needs:
+
+```bash
+# Backup main database
+mysqldump -u root -p \
+  --single-transaction \
+  --routines \
+  --triggers \
+  inapesca_cripsc > smaf_backup_$(date +%Y%m%d).sql
+
+# Compress the backup
+gzip smaf_backup_$(date +%Y%m%d).sql
+```
+
+### Key Tables for Backup Priority
+
+<Accordion title="Critical SMAF Tables">
+
+**User and Authentication:**
+- `crip_usuarios` - User accounts
+- `crip_job` - User job assignments
+- `vw_usuarios` - User view (used for login)
+
+**Commission Management:**
+- `crip_comision` - Commission records
+- `crip_comision_detalle` - Commission details
+- `crip_comision_comprobacion` - Commission verifications
+- `crip_comision_itinerario` - Itineraries
+- `crip_xml_detalle` - XML invoice details
+
+**Financial:**
+- `crip_referencia` - Payment references
+- `crip_referenciaDetalles` - Payment reference details
+- `crip_ministracion` - Budget allocations
+- `crip_pef` - Federal expenditure budget
+
+**Catalog Tables:**
+- `crip_dependencia` - Administrative units
+- `crip_area` - Areas
+- `crip_proyectoexterno` - Projects
+- `crip_programas` - Programs
+- `crip_partidas` - Budget items
+
+</Accordion>
+
+## File System Backup
+
+### File Storage Structure
+
+SMAF stores documents in the following structure:
+
+```text
+/var/www/InapescaWeb/
+├── PDF/
+│   └── {Year}/
+│       └── {Center}/
+│           ├── COMISIONES/
+│           │   └── {OficioNumber}/
+│           │       ├── {Oficio}.pdf
+│           │       └── supporting_docs.pdf
+│           └── COMPROBACIONES/
+│               └── {OficioNumber}/
+├── XML/
+│   └── {Year}/
+│       └── {User}/
+│           └── {UUID}.xml
+├── Images/
+│   └── logos/
+└── Excel/
+    └── uploaded_files.xlsx
+```
+
+### Automated File Backup
+
+<Steps>
+
+<Step title="Create file backup script">
+Create `/usr/local/bin/smaf-files-backup.sh`:
+
+```bash
+#!/bin/bash
+# SMAF File System Backup Script
+
+SOURCE_DIR="/var/www/InapescaWeb"
+BACKUP_DIR="/var/backups/smaf/files"
+DATE=$(date +%Y%m%d)
+RETENTION_DAYS=90
+
+# Create backup directory
+mkdir -p $BACKUP_DIR
+
+# Incremental backup using rsync
+rsync -av --delete \
+  --exclude='obj/' \
+  --exclude='bin/' \
+  --exclude='*.log' \
+  $SOURCE_DIR/ $BACKUP_DIR/current/
+
+# Create compressed archive
+tar -czf $BACKUP_DIR/smaf_files_$DATE.tar.gz \
+  -C $BACKUP_DIR current/PDF \
+  current/XML \
+  current/Images \
+  current/Excel
+
+# Remove old archives
+find $BACKUP_DIR -name "smaf_files_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+
+echo "File backup completed: $DATE"
+```
+</Step>
+
+<Step title="Schedule file backups">
+Add to crontab for nightly backups at 3:00 AM:
+
+```text
+0 3 * * * /usr/local/bin/smaf-files-backup.sh >> /var/log/smaf-files-backup.log 2>&1
+```
+</Step>
+
+</Steps>
+
+### Critical File Types
+
+<CardGroup cols={2}>
+  <Card title="XML Files" icon="file-code">
+    CFDI invoices (versions 3.3 and 4.0) uploaded for expense verification. Located in `/XML/{Year}/{User}/`
+  </Card>
+  <Card title="PDF Documents" icon="file-pdf">
+    Commission notices, payment receipts, and supporting documentation. Located in `/PDF/{Year}/{Center}/`
+  </Card>
+  <Card title="Images" icon="image">
+    Institutional logos and uploaded images. Located in `/Images/`
+  </Card>
+  <Card title="Excel Files" icon="file-excel">
+    Budget data imports and reports. Located in `/Excel/`
+  </Card>
+</CardGroup>
+
+## Configuration Backup
+
+### Web.config Backup
+
+The `web.config` file contains encrypted database connection strings:
+
+```bash
+# Backup configuration
+cp /var/www/InapescaWeb/web.config \
+   /var/backups/smaf/config/web.config.$(date +%Y%m%d)
+```
+
+<Note>
+Connection strings in `web.config` are encrypted using `MngEncriptacion.cs`. Ensure encryption keys are also backed up securely.
+</Note>
+
+**Key configuration elements:**
+- `localhost` - Main database connection
+- `localhost_dgaipp` - DGAIPP database connection
+- `localhostContratos` - Contracts database connection
+- `serveFtp`, `usserFtp`, `passFtp` - FTP credentials
+
+## Database Restoration
+
+### Restore from Backup
+
+<Steps>
+
+<Step title="Stop the application">
+```bash
+# Stop IIS application pool
+appcmd stop apppool /apppool.name:"SMAFAppPool"
+```
+</Step>
+
+<Step title="Restore database">
+```bash
+# Decompress backup
+gunzip smaf_backup_20260312.sql.gz
+
+# Drop existing database (CAUTION!)
+mysql -u root -p -e "DROP DATABASE IF EXISTS inapesca_cripsc;"
+
+# Create new database
+mysql -u root -p -e "CREATE DATABASE inapesca_cripsc CHARACTER SET utf8 COLLATE utf8_general_ci;"
+
+# Restore from backup
+mysql -u root -p inapesca_cripsc < smaf_backup_20260312.sql
+```
+</Step>
+
+<Step title="Verify restoration">
+```sql
+USE inapesca_cripsc;
+
+-- Check table count
+SELECT COUNT(*) FROM information_schema.tables 
+WHERE table_schema = 'inapesca_cripsc';
+
+-- Verify user records
+SELECT COUNT(*) FROM crip_usuarios WHERE ESTATUS = '1';
+
+-- Check latest commission
+SELECT MAX(FECHA_SOL) FROM crip_comision;
+```
+</Step>
+
+<Step title="Restart application">
+```bash
+# Start IIS application pool
+appcmd start apppool /apppool.name:"SMAFAppPool"
+```
+</Step>
+
+</Steps>
+
+### Restore Specific Tables
+
+To restore only specific tables:
+
+```bash
+# Extract specific table
+mysqldump -u root -p inapesca_cripsc crip_comision > comision_backup.sql
+
+# Restore specific table
+mysql -u root -p inapesca_cripsc < comision_backup.sql
+```
+
+## File System Restoration
+
+### Restore Files
+
+```bash
+# Stop application
+appcmd stop apppool /apppool.name:"SMAFAppPool"
+
+# Restore from archive
+tar -xzf smaf_files_20260312.tar.gz -C /var/www/InapescaWeb/
+
+# Set permissions
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/PDF
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/XML
+chmod -R 755 /var/www/InapescaWeb/PDF
+chmod -R 755 /var/www/InapescaWeb/XML
+
+# Restart application
+appcmd start apppool /apppool.name:"SMAFAppPool"
+```
+
+### Restore Specific Year
+
+To restore documents for a specific year only:
+
+```bash
+# Extract specific year
+tar -xzf smaf_files_20260312.tar.gz \
+  --wildcards "current/PDF/2026/*" \
+  -C /var/www/InapescaWeb/
+```
+
+## Disaster Recovery Planning
+
+### Recovery Time Objectives (RTO)
+
+<CardGroup cols={2}>
+  <Card title="Database Recovery" icon="database">
+    **Target RTO:** 2 hours
+    
+    Includes database restoration and verification
+  </Card>
+  <Card title="File System Recovery" icon="folder">
+    **Target RTO:** 4 hours
+    
+    Includes file restoration and permissions
+  </Card>
+  <Card title="Full System Recovery" icon="server">
+    **Target RTO:** 8 hours
+    
+    Complete system rebuild and restoration
+  </Card>
+  <Card title="Configuration Recovery" icon="gear">
+    **Target RTO:** 30 minutes
+    
+    Web.config and connection strings
+  </Card>
+</CardGroup>
+
+### Disaster Recovery Procedures
+
+<Steps>
+
+<Step title="Assess the situation">
+- Determine scope of data loss
+- Identify last successful backup
+- Verify backup integrity
+- Document the incident
+</Step>
+
+<Step title="Prepare recovery environment">
+- Ensure MySQL server is operational
+- Verify IIS is configured
+- Check disk space availability
+- Prepare backup files
+</Step>
+
+<Step title="Execute restoration">
+1. Restore database from most recent backup
+2. Restore file system from most recent backup
+3. Restore configuration files
+4. Apply any transaction logs (if available)
+</Step>
+
+<Step title="Verify and test">
+- Test user authentication
+- Verify commission data integrity
+- Check XML file accessibility
+- Test payment reference generation
+- Validate PDF document access
+</Step>
+
+<Step title="Return to production">
+- Update DNS if necessary
+- Notify users of restoration
+- Monitor system for 24 hours
+- Document recovery process
+</Step>
+
+</Steps>
+
+## Data Retention Policies
+
+### Backup Retention Schedule
+
+| Backup Type | Frequency | Retention Period | Storage Location |
+|-------------|-----------|------------------|------------------|
+| Database | Daily | 30 days online, 1 year archive | `/var/backups/smaf/mysql` |
+| Files | Daily | 90 days online, 2 years archive | `/var/backups/smaf/files` |
+| Configuration | Weekly | 1 year | `/var/backups/smaf/config` |
+| Full System | Monthly | 3 years | Off-site storage |
+
+### Legal Retention Requirements
+
+Per Mexican Federal Public Administration regulations:
+
+<Note>
+**Financial Records:** Commission records, payment references, and XML invoices must be retained for a minimum of 5 years from the fiscal year end for audit purposes.
+</Note>
+
+**Retention periods:**
+- Commission records (`crip_comision`) - 5 years
+- XML invoices (`crip_xml_detalle`) - 5 years  
+- Payment references (`crip_referencia`) - 5 years
+- User activity logs - 2 years
+- Budget allocations (`crip_pef`) - 7 years
+
+## Off-Site Backup Strategy
+
+### Remote Backup Configuration
+
+```bash
+#!/bin/bash
+# Remote backup using rsync over SSH
+
+REMOTE_HOST="backup.servidor.gob.mx"
+REMOTE_USER="smaf-backup"
+REMOTE_PATH="/backups/smaf"
+LOCAL_PATH="/var/backups/smaf"
+
+# Sync to remote server
+rsync -avz --delete \
+  -e "ssh -i /root/.ssh/backup_key" \
+  $LOCAL_PATH/ \
+  $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/
+
+echo "Remote backup completed: $(date)"
+```
+
+### Cloud Storage Integration
+
+For additional redundancy, consider cloud storage:
+
+```bash
+# Upload to cloud storage (example using rclone)
+rclone sync /var/backups/smaf remote:smaf-backups \
+  --exclude "*.tmp" \
+  --log-file=/var/log/rclone-smaf.log
+```
+
+## Backup Verification
+
+### Automated Verification Script
+
+```bash
+#!/bin/bash
+# Verify backup integrity
+
+BACKUP_FILE="/var/backups/smaf/mysql/smaf_$(date +%Y%m%d)*.sql.gz"
+
+# Test database backup
+if [ -f $BACKUP_FILE ]; then
+    # Check if file is valid gzip
+    gunzip -t $BACKUP_FILE
+    if [ $? -eq 0 ]; then
+        echo "Database backup is valid"
+    else
+        echo "ERROR: Database backup is corrupted" | mail -s "SMAF Backup Alert" admin@inapesca.gob.mx
+    fi
+else
+    echo "ERROR: Backup file not found" | mail -s "SMAF Backup Alert" admin@inapesca.gob.mx
+fi
+```
+
+### Monthly Restoration Test
+
+Schedule monthly restoration tests:
+
+```bash
+# Monthly test restoration to staging environment
+0 4 1 * * /usr/local/bin/test-restore.sh >> /var/log/restore-test.log 2>&1
+```
+
+## Monitoring and Alerts
+
+### Backup Monitoring
+
+Monitor backup success:
+
+```bash
+# Check last backup status
+ls -lh /var/backups/smaf/mysql/ | tail -5
+
+# Verify backup size (should be > 100MB for SMAF)
+du -sh /var/backups/smaf/mysql/smaf_$(date +%Y%m%d)*.sql.gz
+```
+
+### Alert Configuration
+
+Configure email alerts for backup failures:
+
+```bash
+# Add to backup script
+if [ $? -ne 0 ]; then
+    echo "Database backup failed on $(hostname) at $(date)" | \
+    mail -s "URGENT: SMAF Backup Failure" admin@inapesca.gob.mx
+fi
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="System Monitoring" href="/admin/monitoring" icon="chart-line">
+    Monitor backup job execution and system health
+  </Card>
+  <Card title="Troubleshooting" href="/admin/troubleshooting" icon="wrench">
+    Resolve common backup and restore issues
+  </Card>
+</CardGroup>

@@ -1,0 +1,219 @@
+---
+title: 'Catalog Management Overview'
+description: 'Comprehensive guide to managing system catalogs in SMAF'
+---
+
+## Introduction
+
+The Catalog Management module (Catálogos) is a core component of SMAF that enables administrators to configure and maintain the essential data structures used throughout the system. This module provides centralized management of projects, programs, budget items, and organizational hierarchies.
+
+<Note>
+Catalog management requires administrative privileges. Only users with roles such as Director General, Director de Administración, Director Adjunto, or Jefe de Centro can access these features.
+</Note>
+
+## Catalog Types
+
+SMAF maintains several interconnected catalogs that form the foundation of the expense control system:
+
+<CardGroup cols={2}>
+  <Card title="Projects" icon="folder-tree" href="/catalogos/projects">
+    Manage project assignments to regional research centers (CRIAPs)
+  </Card>
+  <Card title="Programs" icon="list-check" href="/catalogos/programs">
+    Configure global and local programs with budget allocations
+  </Card>
+  <Card title="Budget Items" icon="file-invoice-dollar" href="/catalogos/budget-items">
+    Administer PEF classifications and partidas presupuestales
+  </Card>
+  <Card title="Organizational Units" icon="building">
+    Maintain administrative units and regional centers
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Hierarchical Data Structure
+
+Catalogs in SMAF follow a hierarchical structure that mirrors the organizational and budgetary framework:
+
+```
+Dirección Adjunta
+└── Componente
+    └── Programa
+        └── Proyecto
+            └── Partida Presupuestal
+```
+
+### Role-Based Access
+
+Different user roles have varying levels of access to catalog management:
+
+<Steps>
+  <Step title="Director General">
+    Full access to create global programs and assign them to all administrative units. Can manage component-level budgets and approve cross-functional (transversal) programs.
+  </Step>
+  
+  <Step title="Director de Administración">
+    Can manage programs within their administrative unit and configure budget allocations for subordinate centers.
+  </Step>
+  
+  <Step title="Director Adjunto">
+    Manages programs and projects for their specific directorate. Can assign local users and CRIP-level coordinators.
+  </Step>
+  
+  <Step title="Jefe de Centro">
+    Limited to managing projects within their assigned regional center (CRIP). Can select existing programs and assign local coordinators.
+  </Step>
+</Steps>
+
+## Data Maintenance
+
+### Validation Rules
+
+The catalog system implements strict validation to maintain data integrity:
+
+- **Unique Constraints**: Project codes are automatically generated based on program and directorate
+- **Budget Validation**: All budget amounts must be numeric and non-negative
+- **Hierarchical Integrity**: Projects can only be assigned to programs within the same directorate, unless marked as transversal
+- **Date Consistency**: All catalog operations are year-specific, using the current fiscal year
+
+<Warning>
+Once a program or project is assigned to a unit, changing the administrative unit assignment requires creating a new entry. The system prevents modification to maintain audit trails.
+</Warning>
+
+### Transversal Programs
+
+SMAF supports transversal (cross-functional) programs that can be shared across multiple directorates:
+
+```csharp
+// Validation for transversal programs
+if (lsdireccion != MngNegocioDependencia.Obtiene_Direccion(lsAdscripcion))
+{
+    if ((oPrograma.Tipo == "2") || (oPrograma.Tipo == "3"))
+    {
+        // Error: Program is not transversal
+        return;
+    }
+}
+```
+
+**Program Types:**
+- Type 1: Transversal (can be used across directorates)
+- Type 2: Directorate-specific
+- Type 3: Local (CRIP-specific)
+
+## Import/Export Capabilities
+
+### Excel Import for PEF
+
+The system supports importing budget classifications from Excel files:
+
+<Steps>
+  <Step title="Prepare Excel File">
+    Format your PEF data according to the federal budget structure with columns for UR, UE, EDO, FI, FU, SF, RG, AI, PP, CP, PARTIDA, TG, FF, PPI, PEF, and monthly allocations.
+  </Step>
+  
+  <Step title="Upload File">
+    Navigate to Catálogos > PEF and use the file upload interface. Specify the exact name of the Excel sheet containing your data.
+  </Step>
+  
+  <Step title="Validation">
+    The system validates all entries and provides feedback on any errors encountered during import.
+  </Step>
+  
+  <Step title="Confirmation">
+    Upon successful import, the PEF catalog is locked for the current fiscal year to prevent duplicate entries.
+  </Step>
+</Steps>
+
+<Note>
+PEF imports can only be performed once per fiscal year. Additional budget items must be added through the adecuaciones (amendments) module.
+</Note>
+
+### Supported File Formats
+
+- **Excel**: `.xlsx`, `.xls` (for PEF import)
+- **Export**: The system generates Excel reports for all catalog types
+
+## Common Operations
+
+### Creating New Catalog Entries
+
+All catalog creation forms follow a consistent pattern:
+
+1. **Select Administrative Context**: Choose the directorate or regional center
+2. **Define Hierarchical Relationships**: Link to parent programs or components
+3. **Enter Descriptive Information**: Name, short description, objective
+4. **Assign Coordinators**: Select responsible personnel from the user catalog
+5. **Allocate Budget**: Enter total and/or monthly budget amounts
+6. **Save and Validate**: System validates all fields before committing
+
+### Updating Existing Data
+
+Certain catalog modifications are restricted to maintain data integrity:
+
+<Warning>
+**Restricted Operations:**
+- Changing project-to-program assignments after creation
+- Modifying budget amounts outside the adecuaciones module
+- Deleting programs with active projects
+- Changing the fiscal year of existing entries
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Establish Clear Naming Conventions">
+    Use consistent, descriptive names for programs and projects. Include the fiscal year and directorate code when applicable.
+    
+    Example: `"PROGRAMA DE INVESTIGACIÓN PESQUERA 2024 - DGAIA"`
+  </Accordion>
+  
+  <Accordion title="Validate Before Mass Import">
+    Always test PEF imports with a small subset of data before uploading the complete federal budget allocation.
+  </Accordion>
+  
+  <Accordion title="Coordinate with Regional Centers">
+    Before assigning projects to CRIPs, verify with center directors that they have the capacity and personnel to manage them.
+  </Accordion>
+  
+  <Accordion title="Document Custom Programs">
+    For programs that deviate from standard federal classifications, maintain external documentation of their purpose and scope.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Considerations
+
+### Database Structure
+
+Catalogs are stored in normalized tables with foreign key relationships:
+
+- `tbl_Programas`: Program master data
+- `tbl_Proyectos`: Project assignments to administrative units
+- `tbl_Pef`: Federal budget classifications
+- `tbl_Proyecto_Partida`: Project-to-budget item mappings
+
+### Performance
+
+For optimal performance when working with large catalogs:
+
+- Catalog dropdowns are filtered by administrative unit and fiscal year
+- Programs are loaded dynamically based on directorate selection
+- Budget item trees use lazy loading for chapters and sub-chapters
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Projects" icon="folder-tree" href="/catalogos/projects">
+    Learn how to assign projects to regional centers
+  </Card>
+  <Card title="Programs" icon="list-check" href="/catalogos/programs">
+    Create and manage program catalogs
+  </Card>
+  <Card title="Budget Items" icon="file-invoice-dollar" href="/catalogos/budget-items">
+    Configure PEF and partidas presupuestales
+  </Card>
+  <Card title="User Roles" icon="users" href="/user-guide/roles-permissions">
+    Understand role-based access control
+  </Card>
+</CardGroup>

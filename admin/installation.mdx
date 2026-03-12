@@ -1,0 +1,436 @@
+---
+title: Installation
+description: Complete guide to installing and deploying SMAF
+---
+
+# System Installation
+
+This guide covers the complete installation process for SMAF (Sistema de Manejo y Administración de Fondos), the internal expense and travel allowance control system for the Mexican Federal Public Administration.
+
+## System Requirements
+
+<Note>
+Ensure all prerequisites are met before beginning the installation process.
+</Note>
+
+### Server Requirements
+
+- **Operating System**: Windows Server 2008 R2 or higher
+- **Web Server**: Internet Information Services (IIS) 7.0 or higher
+- **Framework**: .NET Framework 4.0
+- **Database**: MySQL 5.6 or higher (MySQL 5.6.17 recommended)
+- **Memory**: Minimum 4 GB RAM (8 GB recommended)
+- **Disk Space**: Minimum 2 GB for application, 10 GB for database
+
+### Development Requirements
+
+- **IDE**: Visual Studio 2010 or higher (Visual Studio 2013 recommended)
+- **MSBuild**: Version 4.0
+- **Target Framework**: .NET Framework 4.0
+
+## Required Dependencies
+
+SMAF relies on several third-party components that must be installed before deployment:
+
+### Core Dependencies
+
+<Steps>
+
+<Step title="Telerik UI for ASP.NET AJAX">
+
+**Version**: 2014.2.618.40
+
+Telerik provides the primary UI controls for the application.
+
+```bash
+# Install via NuGet or direct download
+Install-Package Telerik.UI.for.AspNet.Ajax -Version 2014.2.618.40
+```
+
+**Required Assemblies**:
+- `Telerik.Web.UI.dll` (Version 2014.2.618.40)
+- `Telerik.Reporting.dll` (Version 8.1.14.618)
+- `Telerik.ReportViewer.WebForms.dll` (Version 8.1.14.618)
+- `Telerik.OpenAccess.Web.40.dll` (Version 2014.2.617.2)
+- `Telerik.WinControls.UI.dll` (Version 2014.2.617.20)
+- `Telerik.QuickStart.dll`
+
+<Warning>
+Telerik components require a valid license key. Configure the license in web.config after installation.
+</Warning>
+
+</Step>
+
+<Step title="iTextSharp PDF Library">
+
+**Version**: 5.5.5
+
+Required for PDF generation and manipulation.
+
+```bash
+# Install via NuGet
+Install-Package iTextSharp -Version 5.5.5
+```
+
+**Required Assemblies**:
+- `itextsharp.dll`
+- `itextsharp.pdfa.dll`
+- `itextsharp.xtra.dll`
+
+</Step>
+
+<Step title="QRCoder Library">
+
+Used for QR code generation on official documents and receipts.
+
+```bash
+# Install via NuGet
+Install-Package QRCoder
+```
+
+**Required Assembly**: `QRCoder.dll`
+
+</Step>
+
+<Step title="Ajax Control Toolkit">
+
+**Version**: 4.1.40412.0 (Spanish culture)
+
+Provides additional AJAX functionality and controls.
+
+```bash
+# Install via NuGet
+Install-Package AjaxControlToolkit -Version 4.1.40412
+```
+
+**Required Assemblies**:
+- `AjaxControlToolkit.dll` (Culture: es)
+- `AjaxControlToolkit.resources.dll`
+
+</Step>
+
+<Step title="Microsoft Report Viewer">
+
+**Version**: 10.0.0.0
+
+Required for report generation and viewing.
+
+```bash
+# Download from Microsoft
+# Install Microsoft Report Viewer 2010 Redistributable
+```
+
+**Required Assembly**: `Microsoft.ReportViewer.WebForms.dll` (Version 10.0.0.0)
+
+</Step>
+
+</Steps>
+
+### Additional Framework Dependencies
+
+The following .NET Framework assemblies are required:
+
+- `System.Design` (Version 4.0.0.0)
+- `System.Web.Extensions` (Version 4.0.0.0)
+- `System.Web.Extensions.Design` (Version 4.0.0.0)
+- `System.Windows.Forms` (Version 4.0.0.0)
+- `Microsoft.Build.Framework` (Version 4.0.0.0)
+- `System.Management` (Version 4.0.0.0)
+- `System.Speech` (Version 4.0.0.0)
+
+## Installation Steps
+
+<Steps>
+
+<Step title="Prepare the Environment">
+
+1. Install Windows Server 2008 R2 or higher
+2. Install .NET Framework 4.0
+3. Enable IIS with ASP.NET 4.0
+4. Install MySQL Server 5.6 or higher
+
+```powershell
+# Enable IIS with ASP.NET
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET45
+```
+
+</Step>
+
+<Step title="Install Visual Studio and Build Tools">
+
+For development environments:
+
+1. Install Visual Studio 2010 or higher
+2. Install ASP.NET and Web Development workload
+3. Install .NET Framework 4.0 targeting pack
+
+</Step>
+
+<Step title="Install Third-Party Dependencies">
+
+Install all required dependencies listed above. Copy DLL files to the project's `bin` directory or install via NuGet package manager.
+
+```bash
+# Navigate to project directory
+cd C:\inetpub\wwwroot\InapescaWeb
+
+# Restore NuGet packages
+nuget restore InapescaWeb.csproj
+```
+
+</Step>
+
+<Step title="Build the Application">
+
+Compile the application using MSBuild:
+
+```bash
+# Build in Release mode
+msbuild InapescaWeb.csproj /p:Configuration=Release /p:TargetFrameworkVersion=v4.0
+```
+
+**Project Structure**:
+- `InapescaWeb.csproj` - Main web application
+- `InapescaWeb.BRL.csproj` - Business rules layer
+- `InapescaWeb.DAL.csproj` - Data access layer
+- `InapescaWeb.Entidades.csproj` - Entity classes
+
+</Step>
+
+<Step title="Configure IIS Application Pool">
+
+Create a dedicated application pool for SMAF:
+
+```powershell
+# Create new application pool
+New-WebAppPool -Name "SMAF_AppPool"
+
+# Configure application pool
+Set-ItemProperty "IIS:\AppPools\SMAF_AppPool" -Name "managedRuntimeVersion" -Value "v4.0"
+Set-ItemProperty "IIS:\AppPools\SMAF_AppPool" -Name "managedPipelineMode" -Value "Integrated"
+```
+
+</Step>
+
+<Step title="Deploy to IIS">
+
+Create the IIS website and deploy the application:
+
+```powershell
+# Create website directory
+New-Item -Path "C:\inetpub\wwwroot\SMAF" -ItemType Directory
+
+# Copy application files
+Copy-Item -Path ".\InapescaWeb\*" -Destination "C:\inetpub\wwwroot\SMAF" -Recurse
+
+# Create IIS website
+New-Website -Name "SMAF" -Port 80 -PhysicalPath "C:\inetpub\wwwroot\SMAF" -ApplicationPool "SMAF_AppPool"
+```
+
+</Step>
+
+<Step title="Set File Permissions">
+
+Configure appropriate file system permissions:
+
+```powershell
+# Grant IIS AppPool identity permissions
+icacls "C:\inetpub\wwwroot\SMAF" /grant "IIS APPPOOL\SMAF_AppPool:(OI)(CI)M"
+icacls "C:\inetpub\wwwroot\SMAF\App_Data" /grant "IIS APPPOOL\SMAF_AppPool:(OI)(CI)F"
+icacls "C:\inetpub\wwwroot\SMAF\PDF" /grant "IIS APPPOOL\SMAF_AppPool:(OI)(CI)F"
+icacls "C:\inetpub\wwwroot\SMAF\XML" /grant "IIS APPPOOL\SMAF_AppPool:(OI)(CI)F"
+```
+
+</Step>
+
+<Step title="Configure MySQL Connector">
+
+Install MySQL Connector/NET for .NET Framework 4.0:
+
+```bash
+# Download and install MySQL Connector/NET 6.9.x
+# https://dev.mysql.com/downloads/connector/net/
+```
+
+</Step>
+
+<Step title="Setup Database">
+
+Import the database schema and initial data:
+
+```bash
+mysql -u root -p < inapesca_cripsc.sql
+```
+
+See [Database Setup](/admin/database-setup) for detailed instructions.
+
+</Step>
+
+<Step title="Configure web.config">
+
+Update connection strings and application settings:
+
+```bash
+# Navigate to application directory
+cd C:\inetpub\wwwroot\SMAF
+
+# Edit web.config with appropriate settings
+notepad web.config
+```
+
+See [Configuration](/admin/configuration) for detailed settings.
+
+</Step>
+
+<Step title="Verify Installation">
+
+Test the installation:
+
+1. Open web browser and navigate to `http://localhost`
+2. Verify the login page loads correctly
+3. Test database connectivity by logging in with a test user
+4. Check IIS logs for any errors: `C:\inetpub\logs\LogFiles`
+
+```powershell
+# Check application event logs
+Get-EventLog -LogName Application -Source "ASP.NET*" -Newest 50
+```
+
+</Step>
+
+</Steps>
+
+## Post-Installation Tasks
+
+### Configure SSL/TLS
+
+For production environments, enable HTTPS:
+
+```powershell
+# Install SSL certificate
+Import-PfxCertificate -FilePath "certificate.pfx" -CertStoreLocation Cert:\LocalMachine\My
+
+# Bind SSL to website
+New-WebBinding -Name "SMAF" -Protocol https -Port 443 -SslFlags 0
+```
+
+### Setup Scheduled Tasks
+
+Configure automated maintenance tasks:
+
+- Database backups (daily)
+- Log file cleanup (weekly)
+- Session cleanup (daily)
+- Report generation (as needed)
+
+### Configure Firewall
+
+```powershell
+# Allow HTTP/HTTPS traffic
+New-NetFirewallRule -DisplayName "SMAF HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+New-NetFirewallRule -DisplayName "SMAF HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+
+<Accordion title="Application fails to start">
+
+**Symptoms**: HTTP 500 errors or application won't load
+
+**Solutions**:
+1. Verify .NET Framework 4.0 is installed
+2. Check application pool identity has correct permissions
+3. Review IIS logs and Windows Event Viewer
+4. Ensure all dependencies are installed in the `bin` directory
+
+```bash
+# Check .NET Framework installation
+reg query "HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" /v Version
+```
+
+</Accordion>
+
+<Accordion title="Database connection errors">
+
+**Symptoms**: Login fails, "Connection string not found" errors
+
+**Solutions**:
+1. Verify MySQL service is running
+2. Check connection string encryption/decryption
+3. Validate database credentials
+4. Test MySQL connectivity from server
+
+```bash
+# Test MySQL connection
+mysql -h localhost -u smaf_user -p inapesca_cripsc
+```
+
+</Accordion>
+
+<Accordion title="Telerik controls not rendering">
+
+**Symptoms**: UI components missing or displaying incorrectly
+
+**Solutions**:
+1. Verify Telerik assemblies are in `bin` directory
+2. Check Telerik version matches web.config registration
+3. Enable CDN or disable CDN based on network configuration
+4. Verify Telerik license is valid
+
+</Accordion>
+
+<Accordion title="File upload failures">
+
+**Symptoms**: Cannot upload documents or XML files
+
+**Solutions**:
+1. Check `maxRequestLength` setting in web.config (default: 50000 KB)
+2. Verify IIS request limits in applicationHost.config
+3. Ensure upload directories have write permissions
+4. Check disk space availability
+
+```xml
+<!-- Increase upload limit in web.config -->
+<httpRuntime maxRequestLength="50000" />
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Upgrade Path
+
+### From Previous Versions
+
+When upgrading from earlier versions:
+
+1. Backup current database and files
+2. Review breaking changes in release notes
+3. Update database schema with migration scripts
+4. Deploy new application files
+5. Update web.config settings
+6. Test thoroughly in staging environment
+7. Schedule maintenance window for production deployment
+
+<Warning>
+Always perform a complete backup before upgrading. Test the upgrade process in a staging environment first.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Configuration" icon="gear" href="/admin/configuration">
+Configure web.config settings, connection strings, and application parameters
+</Card>
+
+<Card title="Database Setup" icon="database" href="/admin/database-setup">
+Setup MySQL database, import schema, and configure initial data
+</Card>
+
+</CardGroup>

@@ -1,0 +1,186 @@
+---
+title: 'Pagos - Overview'
+description: 'Introduction to payment processing for travel allowances in SMAF'
+---
+
+# Payment Processing Overview
+
+The payment module in SMAF handles the disbursement of travel allowances (viáticos) to employees after their travel assignments have been approved. This module integrates with fund allocations (ministraciones) to ensure proper budget tracking and financial control.
+
+## Payment Types
+
+SMAF supports payments for multiple travel expense categories:
+
+### 1. Viáticos (Travel Allowances)
+Daily allowances for meals and incidental expenses during official travel.
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Total_Viaticos) > 0)
+{
+    clsFuncionesGral.Activa_Paneles(pnlViaticos, true);
+}
+```
+
+### 2. Combustible (Fuel)
+Reimbursement for fuel expenses when using personal or official vehicles.
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Combustible_Efectivo) > 0)
+{
+    clsFuncionesGral.Activa_Paneles(pnlCombustible, true);
+}
+```
+
+### 3. Peajes (Tolls)
+Reimbursement for highway toll expenses.
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Peaje) > 0)
+{
+    clsFuncionesGral.Activa_Paneles(pnlPeaje, true);
+}
+```
+
+### 4. Pasajes (Transportation)
+Reimbursement for public transportation, taxis, or other travel costs.
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Pasaje) > 0)
+{
+    clsFuncionesGral.Activa_Paneles(pnlPasajes, true);
+}
+```
+
+### 5. Singladuras (Maritime Days)
+Special allowance for maritime field work.
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Singladuras) > 0)
+{
+    clsFuncionesGral.Activa_Paneles(pnlSingladuras, true);
+}
+```
+
+## Payment Methods
+
+The system supports two payment methods configured through the `dplTipoPago` dropdown:
+
+<ParamField path="cheque" type="string">
+  Physical check issued to the employee
+</ParamField>
+
+<ParamField path="deposito a cuenta" type="string">
+  Direct deposit to employee's bank account
+</ParamField>
+
+```csharp
+clsFuncionesGral.Llena_Lista(dplTipoPago, 
+    clsFuncionesGral.ConvertMayus("cheque|deposito a cuenta"));
+```
+
+## Bank Reference Generation
+
+Each payment requires a unique bank reference (`referencia bancaria`) for tracking and reconciliation:
+
+<Steps>
+  <Step title="Enter Bank Information">
+    Input destination bank details:
+    - Bank name (`txtBanco`)
+    - Account number (`txtCuenta`)
+    - CLABE interbank code (`txtClabe`)
+  </Step>
+  
+  <Step title="Generate Reference">
+    Create a unique bank reference number in `txtReferencia`
+  </Step>
+  
+  <Step title="Specify Payment Date">
+    Set the payment date using the calendar control (`txtFecha`)
+  </Step>
+</Steps>
+
+```csharp
+if ((txtReferencia.Text == null) | (txtReferencia.Text == ""))
+{
+    ClientScript.RegisterStartupScript(this.GetType(), "Inapesca", 
+        "alert('Referencia bancaria Obligatorio');", true);
+    return;
+}
+else
+{
+    lsReferencia = txtReferencia.Text;
+}
+```
+
+## Payment Workflow
+
+The payment process follows these stages:
+
+1. **Commission Selection**: Select an approved travel assignment (comisión) awaiting payment
+2. **Ministracion Association**: Link the payment to an existing or new fund allocation
+3. **Amount Entry**: Enter payment amounts for each expense category
+4. **Bank Details**: Provide bank account and reference information
+5. **Validation**: System validates amounts against requested expenses
+6. **Registration**: Payment is recorded and status updated
+
+<Note>
+Payments can only be processed for commissions that have been approved and are in financial pending status (`Financieros != "2"`).
+</Note>
+
+## Payment Status Tracking
+
+The system tracks payment status through the `ComisionDetalle` entity:
+
+```csharp
+ComisionDetalle oCdetalle = MngNegocioComisionDetalle.Obtiene_detalle(
+    DetalleComision.Archivo, 
+    DetalleComision.Comisionado, 
+    DetalleComision.Ubicacion_Comisionado, 
+    Year
+);
+
+if (oCdetalle.Financieros == "2")
+{
+    // Commission already paid
+    ClientScript.RegisterStartupScript(this.GetType(), "Inapesca", 
+        "alert('Esta Comision ya fue pagada');", true);
+    return;
+}
+```
+
+### Status Codes
+
+- `"0"` - Pending payment
+- `"1"` - Partial payment
+- `"2"` - Fully paid
+
+<Warning>
+Once a commission is marked as fully paid (`Financieros = "2"`), additional payments can only be made through the reimbursement module.
+</Warning>
+
+## Access Control
+
+Payment processing requires specific role permissions:
+
+```csharp
+if ((Session["Crip_Rol"].ToString() == Dictionary.ADMINISTRADOR) | 
+    (Session["Crip_Rol"].ToString() == Dictionary.JEFE_CENTRO))
+{
+    // Load commissions for center administrator
+    gvFiscales.DataSource = MngNegocioPago.Comisiones_Pagar(
+        Session["Crip_Ubicacion"].ToString(), Year);
+    gvFiscales.DataBind();
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Processing" icon="money-bill-transfer" href="/pagos/payment-processing">
+    Learn how to process travel allowance payments step-by-step
+  </Card>
+  
+  <Card title="Fund Allocations" icon="coins" href="/ministraciones/overview">
+    Understand how ministraciones work with payments
+  </Card>
+</CardGroup>

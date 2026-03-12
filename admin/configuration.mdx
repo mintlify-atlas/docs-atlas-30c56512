@@ -1,0 +1,561 @@
+---
+title: Configuration
+description: Comprehensive guide to configuring SMAF application settings
+---
+
+# Application Configuration
+
+This guide covers all configuration aspects of SMAF, including web.config settings, connection strings, application parameters, and security configurations.
+
+## web.config Overview
+
+The main configuration file for SMAF is `web.config`, located in the application root directory. It contains:
+
+- Connection string encryption keys
+- Application settings and parameters
+- HTTP handlers and modules
+- Compilation and runtime settings
+- Custom error pages
+- Security headers
+
+## Connection Strings
+
+<Note>
+All connection strings in SMAF are encrypted for security. They are stored in the `<appSettings>` section and decrypted at runtime.
+</Note>
+
+### Encrypted Connection Strings
+
+SMAF uses encrypted connection strings stored as Base64-encoded values:
+
+```xml
+<appSettings>
+  <!-- Localhost connection -->
+  <add key="localhost" value="tGf1BXWYdXKSsk+PoraCYtfZx2CaCz+YSH7fEzln+tPCCIPyhXka5KxFVkYaJDYXUGY8BwEgL2KIww23CpBtBw==" />
+  
+  <!-- Secondary database for DGAIPP -->
+  <add key="localhost_dgaipp" value="tGf1BXWYdXKSsk+PoraCYvUxO9Yfr80kpFMxpZN60zKA15b9S5UHaufvII8GtSL31z1MDYDQY1WfatINvt6oeA==" />
+  
+  <!-- Contracts module database -->
+  <add key="localhostContratos" value="tGf1BXWYdXKSsk+PoraCYtVinw280AItxsg+VLaNj/o7oyAGqMk2uYLgH9n62iN8pqm0L6HC13Vh3NMoZ6XwNg=="/>
+  
+  <!-- Consultation module database -->
+  <add key="localhostModuloConsulta" value="tGf1BXWYdXKSsk+PoraCYrioXQJOX9pGP5JYLm+chnXLArjtPmzrYgj0bXoK25p6VkaTYQ7WZXgO68Ea+2yMUg=="/>
+  
+  <!-- Remote consultation module -->
+  <add key="RemoteModuloConsulta" value="hrnTL95uB4MKXvva926/GF8JrRN55ECV3YFAQcOqZofeSKwRCwWvdwYSQsMrhUWTyoVMS5csRY1hKkmrUhm3X9mLpkaVSi4aty9pDu+/yfY="/>
+  
+  <!-- Production connection for inapesca.info -->
+  <add key="Inapesca.Info" value="djA2lV0XWy0iT9WVJNz7cph7S2HxEkzD6fsjJqwBAO0z9x4SvgnVFrNbD4FeDknucam0VW5EKi7FxPyYZ5zWhmwQcve9d7EtF+kkRihos1jhqyxdzVxOWB/P9viCBKO3" />
+</appSettings>
+```
+
+### Connection String Format
+
+When decrypted, connection strings follow this format:
+
+```plaintext
+Server=localhost;Database=inapesca_cripsc;Uid=username;Pwd=password;Charset=utf8;
+```
+
+### Encrypting Connection Strings
+
+To generate encrypted connection strings:
+
+1. Navigate to the encryption utility: `/Utilerias/Encriptador.aspx`
+2. Enter the plain-text connection string
+3. Click "Encrypt" to generate the Base64-encoded value
+4. Copy the encrypted value to web.config
+
+<Warning>
+Never store plain-text connection strings in web.config. Always use the encryption utility to protect database credentials.
+</Warning>
+
+### Connection String Usage
+
+The application selects connection strings based on the environment:
+
+```csharp
+// Access encrypted connection string
+string encryptedConnection = ConfigurationManager.AppSettings["localhost"];
+string connectionString = DecryptConnectionString(encryptedConnection);
+```
+
+## FTP Configuration
+
+SMAF supports FTP for file transfers and document storage:
+
+```xml
+<appSettings>
+  <!-- FTP Server -->
+  <add key="serveFtp" value="NqQ35BDAED3OOCsV5gs5pAY4+p1CUkQ3J+5GK4YDblI=" />
+  
+  <!-- FTP Username -->
+  <add key="usserFtp" value="MF8OF7DpfQ26I4qxQHZpDg==" />
+  
+  <!-- FTP Password -->
+  <add key="passFtp" value="zvlBDXZDHLCKREUYxA9OSQ==" />
+</appSettings>
+```
+
+Decrypted format:
+- **Server**: `ftp://servername.domain.com`
+- **Username**: FTP account username
+- **Password**: FTP account password
+
+## Telerik Configuration
+
+### CDN Settings
+
+Telerik can load resources from CDN or local files:
+
+```xml
+<appSettings>
+  <!-- Enable Telerik CDN for scripts -->
+  <add key="Telerik.ScriptManager.TelerikCdn" value="Enabled" />
+  
+  <!-- Enable Telerik CDN for stylesheets -->
+  <add key="Telerik.StyleSheetManager.TelerikCdn" value="Enabled" />
+</appSettings>
+```
+
+**Options**:
+- `Enabled`: Load resources from Telerik CDN (requires internet connectivity)
+- `Disabled`: Load resources from local application directory
+
+<Note>
+For production environments behind firewalls, set both values to `Disabled` and ensure Telerik resources are deployed locally.
+</Note>
+
+### Telerik HTTP Handlers
+
+Telerik controls require specific HTTP handlers:
+
+```xml
+<system.web>
+  <httpHandlers>
+    <add path="Telerik.Web.UI.WebResource.axd" type="Telerik.Web.UI.WebResource" verb="*" validate="false" />
+    <add path="ChartImage.axd" type="Telerik.Web.UI.ChartHttpHandler" verb="*" validate="false" />
+    <add path="Telerik.Web.UI.SpellCheckHandler.axd" type="Telerik.Web.UI.SpellCheckHandler" verb="*" validate="false" />
+    <add path="Telerik.Web.UI.DialogHandler.aspx" type="Telerik.Web.UI.DialogHandler" verb="*" validate="false" />
+    <add path="Telerik.RadUploadProgressHandler.ashx" type="Telerik.Web.UI.RadUploadProgressHandler" verb="*" validate="false" />
+  </httpHandlers>
+</system.web>
+```
+
+### Telerik HTTP Modules
+
+```xml
+<system.web>
+  <httpModules>
+    <add name="RadUploadModule" type="Telerik.Web.UI.RadUploadHttpModule" />
+    <add name="RadCompression" type="Telerik.Web.UI.RadCompression" />
+  </httpModules>
+</system.web>
+```
+
+### IIS Integrated Mode Configuration
+
+For IIS 7.0+ with Integrated Pipeline Mode:
+
+```xml
+<system.webServer>
+  <handlers>
+    <remove name="ChartImage_axd" />
+    <remove name="Telerik_Web_UI_SpellCheckHandler_axd" />
+    <remove name="Telerik_Web_UI_DialogHandler_aspx" />
+    <remove name="Telerik_RadUploadProgressHandler_ashx" />
+    <remove name="Telerik_Web_UI_WebResource_axd" />
+    
+    <add name="Telerik_Web_UI_WebResource_axd" path="Telerik.Web.UI.WebResource.axd" 
+         type="Telerik.Web.UI.WebResource" verb="*" preCondition="integratedMode" />
+    <add name="ChartImage_axd" path="ChartImage.axd" 
+         type="Telerik.Web.UI.ChartHttpHandler" verb="*" preCondition="integratedMode" />
+    <add name="Telerik_Web_UI_SpellCheckHandler_axd" path="Telerik.Web.UI.SpellCheckHandler.axd" 
+         type="Telerik.Web.UI.SpellCheckHandler" verb="*" preCondition="integratedMode" />
+    <add name="Telerik_Web_UI_DialogHandler_aspx" path="Telerik.Web.UI.DialogHandler.aspx" 
+         type="Telerik.Web.UI.DialogHandler" verb="*" preCondition="integratedMode" />
+    <add name="Telerik_RadUploadProgressHandler_ashx" path="Telerik.RadUploadProgressHandler.ashx" 
+         type="Telerik.Web.UI.RadUploadProgressHandler" verb="*" preCondition="integratedMode" />
+  </handlers>
+  
+  <modules runAllManagedModulesForAllRequests="true">
+    <remove name="RadUploadModule" />
+    <remove name="RadCompression" />
+    <add name="RadUploadModule" type="Telerik.Web.UI.RadUploadHttpModule" preCondition="integratedMode" />
+    <add name="RadCompression" type="Telerik.Web.UI.RadCompression" preCondition="integratedMode" />
+  </modules>
+</system.webServer>
+```
+
+## Compilation Settings
+
+```xml
+<system.web>
+  <compilation debug="true" targetFramework="4.0">
+    <assemblies>
+      <add assembly="System.Design, Version=4.0.0.0, Culture=neutral, PublicKeyToken=B03F5F7F11D50A3A" />
+      <add assembly="System.Web.Extensions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31BF3856AD364E35" />
+      <add assembly="System.Web.Extensions.Design, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31BF3856AD364E35" />
+      <add assembly="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=B77A5C561934E089" />
+      <add assembly="Microsoft.Build.Framework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=B03F5F7F11D50A3A" />
+      <add assembly="System.Management, Version=4.0.0.0, Culture=neutral, PublicKeyToken=B03F5F7F11D50A3A" />
+      <add assembly="System.Speech, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31BF3856AD364E35" />
+    </assemblies>
+  </compilation>
+</system.web>
+```
+
+**Settings**:
+- `debug="true"`: Enable debug mode (set to `false` for production)
+- `targetFramework="4.0"`: Target .NET Framework 4.0
+
+<Warning>
+In production environments, set `debug="false"` to improve performance and disable detailed error messages.
+</Warning>
+
+## File Upload Configuration
+
+### Maximum Request Length
+
+```xml
+<system.web>
+  <httpRuntime maxRequestLength="50000" />
+</system.web>
+```
+
+**Settings**:
+- `maxRequestLength`: Maximum file upload size in kilobytes (50 MB = 50000 KB)
+
+### IIS Request Limits
+
+For IIS 7.0+, also configure request limits:
+
+```xml
+<system.webServer>
+  <security>
+    <requestFiltering>
+      <requestLimits maxAllowedContentLength="52428800" />
+    </requestFiltering>
+  </security>
+</system.webServer>
+```
+
+**Note**: `maxAllowedContentLength` is in bytes (50 MB = 52,428,800 bytes)
+
+## Session Configuration
+
+```xml
+<system.web>
+  <sessionState mode="InProc" timeout="60" />
+</system.web>
+```
+
+**Settings**:
+- `mode`: Session state mode
+  - `InProc`: Store sessions in worker process memory (default)
+  - `StateServer`: Store sessions in separate ASP.NET state service
+  - `SQLServer`: Store sessions in SQL Server database
+- `timeout`: Session timeout in minutes (default: 60)
+
+## Custom Error Pages
+
+```xml
+<system.web>
+  <customErrors mode="RemoteOnly" defaultRedirect="../index.aspx" />
+</system.web>
+```
+
+**Modes**:
+- `RemoteOnly`: Show detailed errors locally, custom errors remotely (recommended for production)
+- `On`: Always show custom error pages
+- `Off`: Always show detailed error messages (development only)
+
+<Note>
+The default redirect sends users to the login page (`../index.aspx`) when an unhandled error occurs.
+</Note>
+
+## Security Headers
+
+### X-Frame-Options
+
+Prevent clickjacking attacks:
+
+```xml
+<system.webServer>
+  <httpProtocol>
+    <customHeaders>
+      <add name="X-Frame-Options" value="DENY" />
+    </customHeaders>
+  </httpProtocol>
+</system.webServer>
+```
+
+**Options**:
+- `DENY`: Prevent all framing
+- `SAMEORIGIN`: Allow framing from same origin
+- `ALLOW-FROM uri`: Allow framing from specific URI
+
+### Additional Security Headers (Recommended)
+
+```xml
+<system.webServer>
+  <httpProtocol>
+    <customHeaders>
+      <add name="X-Frame-Options" value="DENY" />
+      <add name="X-Content-Type-Options" value="nosniff" />
+      <add name="X-XSS-Protection" value="1; mode=block" />
+      <add name="Referrer-Policy" value="strict-origin-when-cross-origin" />
+    </customHeaders>
+  </httpProtocol>
+</system.webServer>
+```
+
+## Page Configuration
+
+```xml
+<system.web>
+  <pages>
+    <controls>
+      <add tagPrefix="telerik" namespace="Telerik.Web.UI" assembly="Telerik.Web.UI" />
+    </controls>
+  </pages>
+</system.web>
+```
+
+Registers Telerik controls for use in all pages with the `telerik:` prefix.
+
+## Validation Settings
+
+```xml
+<system.webServer>
+  <validation validateIntegratedModeConfiguration="false" />
+</system.webServer>
+```
+
+Disables validation of integrated mode configuration, allowing both classic and integrated pipeline mode configurations to coexist.
+
+## Report Viewer Configuration
+
+Microsoft Report Viewer handler:
+
+```xml
+<system.web>
+  <httpHandlers>
+    <add path="Reserved.ReportViewerWebControl.axd" verb="*" 
+         type="Microsoft.Reporting.WebForms.HttpHandler, Microsoft.ReportViewer.WebForms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" 
+         validate="false" />
+  </httpHandlers>
+</system.web>
+```
+
+## Environment-Specific Configuration
+
+### Development Environment
+
+```xml
+<!-- Web.Debug.config transformations -->
+<configuration>
+  <system.web>
+    <compilation xdt:Transform="SetAttributes" debug="true" />
+    <customErrors mode="Off" xdt:Transform="SetAttributes" />
+  </system.web>
+</configuration>
+```
+
+### Production Environment
+
+```xml
+<!-- Web.Release.config transformations -->
+<configuration>
+  <system.web>
+    <compilation xdt:Transform="RemoveAttributes(debug)" />
+    <customErrors mode="RemoteOnly" xdt:Transform="SetAttributes" />
+  </system.web>
+</configuration>
+```
+
+## Performance Optimization
+
+### Enable Response Compression
+
+```xml
+<system.webServer>
+  <urlCompression doStaticCompression="true" doDynamicCompression="true" />
+</system.webServer>
+```
+
+### Static Content Caching
+
+```xml
+<system.webServer>
+  <staticContent>
+    <clientCache cacheControlMode="UseMaxAge" cacheControlMaxAge="7.00:00:00" />
+  </staticContent>
+</system.webServer>
+```
+
+### Application Pool Settings (IIS Configuration)
+
+```powershell
+# Configure application pool recycling
+Set-ItemProperty "IIS:\AppPools\SMAF_AppPool" -Name "recycling.periodicRestart.time" -Value "1.05:00:00"
+
+# Set memory limits
+Set-ItemProperty "IIS:\AppPools\SMAF_AppPool" -Name "recycling.periodicRestart.memory" -Value 1048576
+
+# Configure idle timeout
+Set-ItemProperty "IIS:\AppPools\SMAF_AppPool" -Name "processModel.idleTimeout" -Value "00:20:00"
+```
+
+## Logging and Diagnostics
+
+### Enable Trace Output
+
+For debugging purposes:
+
+```xml
+<system.web>
+  <trace enabled="false" requestLimit="10" pageOutput="false" traceMode="SortByTime" localOnly="true" />
+</system.web>
+```
+
+<Warning>
+Never enable trace output in production environments as it may expose sensitive information.
+</Warning>
+
+### Failed Request Tracing (IIS)
+
+```powershell
+# Enable failed request tracing
+Set-WebConfigurationProperty -PSPath "MACHINE/WEBROOT/APPHOST" -Filter "system.webServer/tracing/traceFailedRequests" -Name "enabled" -Value $true
+```
+
+## Configuration Best Practices
+
+<Steps>
+
+<Step title="Use Configuration Transformations">
+
+Maintain separate configurations for each environment:
+- `Web.config` - Base configuration
+- `Web.Debug.config` - Development overrides
+- `Web.Release.config` - Production overrides
+
+</Step>
+
+<Step title="Encrypt Sensitive Data">
+
+Always encrypt:
+- Database connection strings
+- FTP credentials
+- API keys
+- Email server passwords
+
+</Step>
+
+<Step title="Disable Debug Mode in Production">
+
+```xml
+<compilation debug="false" targetFramework="4.0" />
+```
+
+</Step>
+
+<Step title="Use Custom Error Pages">
+
+```xml
+<customErrors mode="RemoteOnly" defaultRedirect="../index.aspx">
+  <error statusCode="404" redirect="~/errors/404.aspx" />
+  <error statusCode="500" redirect="~/errors/500.aspx" />
+</customErrors>
+```
+
+</Step>
+
+<Step title="Implement Security Headers">
+
+Add security headers to protect against common web vulnerabilities.
+
+</Step>
+
+<Step title="Regular Configuration Audits">
+
+Periodically review:
+- Connection string encryption
+- Session timeout settings
+- File upload limits
+- Security headers
+- Enabled features and modules
+
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Connection string decryption failures">
+
+**Symptoms**: Database connection errors, decryption exceptions
+
+**Solutions**:
+1. Verify encryption key is correct
+2. Re-encrypt connection string using utility
+3. Check for leading/trailing spaces in appSettings values
+4. Ensure Base64 encoding is preserved during copy/paste
+
+</Accordion>
+
+<Accordion title="Telerik controls not loading">
+
+**Symptoms**: Missing UI controls, JavaScript errors
+
+**Solutions**:
+1. Verify CDN settings match network configuration
+2. Check HTTP handler registration
+3. Ensure Telerik assemblies are in bin directory
+4. Review browser console for resource loading errors
+
+</Accordion>
+
+<Accordion title="File upload failures">
+
+**Symptoms**: "Maximum request length exceeded" error
+
+**Solutions**:
+1. Increase `maxRequestLength` in web.config
+2. Increase `maxAllowedContentLength` in system.webServer
+3. Verify both settings match (convert KB to bytes)
+4. Check IIS request limits in applicationHost.config
+
+</Accordion>
+
+<Accordion title="Session timeout issues">
+
+**Symptoms**: Users logged out unexpectedly
+
+**Solutions**:
+1. Increase session timeout value
+2. Consider using StateServer or SQLServer session mode for web farms
+3. Implement session extension mechanism
+4. Check application pool recycling settings
+
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Database Setup" icon="database" href="/admin/database-setup">
+Configure MySQL database and import schema
+</Card>
+
+<Card title="User Management" icon="users" href="/admin/user-management">
+Manage user accounts and permissions
+</Card>
+
+</CardGroup>

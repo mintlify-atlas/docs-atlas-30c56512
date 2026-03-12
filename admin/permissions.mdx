@@ -1,0 +1,565 @@
+---
+title: Permissions and Access Control
+description: Role-based access control, permission levels, and authorization in SMAF
+---
+
+## Overview
+
+SMAF implements a comprehensive role-based access control (RBAC) system to manage permissions across different organizational levels. The permission system controls access to modules, features, and data based on user roles and hierarchical relationships.
+
+## Role-Based Access Control (RBAC)
+
+### Permission Entity Structure
+
+The system manages permissions through the `crip_permisos` table with the following structure:
+
+```sql
+CREATE TABLE crip_permisos (
+    CLV_USUARIO VARCHAR,      -- User ID
+    PERMISO VARCHAR,          -- Permission code
+    AUT_EXTERNO VARCHAR,      -- External authorizer
+    CLV_PROY VARCHAR,         -- Project code
+    CLV_DEP_PROY VARCHAR,     -- Project department
+    ESTATUS VARCHAR,          -- Status (1=Active, 0=Inactive)
+    FECHA DATE,               -- Permission date
+    OBSERVACIONES TEXT,       -- Notes/observations
+    CANTIDAD_PERMISOS INT     -- Number of permissions
+)
+```
+
+## Permission Levels and Roles
+
+### Organizational Hierarchy
+
+The system defines a hierarchical permission structure based on roles:
+
+<Steps>
+  <Step title="Level 1: General Director">
+    **Role Code:** `DIRGRAINA`
+    
+    - Highest authority level
+    - System-wide access to all modules and data
+    - Can authorize any request regardless of amount or type
+    - Access to all departments and centers
+  </Step>
+
+  <Step title="Level 2: Adjunct Directors">
+    **Role Codes:** `DIRADJUNT`, `SUBDIRAD`
+    
+    - Regional authority over assigned directorates
+    - Can approve requests within their directorate
+    - Access to all centers under their directorate
+    - Budget oversight for their area
+  </Step>
+
+  <Step title="Level 3: Administrative Directors">
+    **Role Codes:** `DIRADMIN`, `ADMINP`
+    
+    - Financial and administrative oversight
+    - Budget management and approval authority
+    - System configuration access
+    - User management capabilities
+  </Step>
+
+  <Step title="Level 4: Center Chiefs">
+    **Role Code:** `JFCCRIPSC`
+    
+    - Authority over specific research centers
+    - Approval of requests from center personnel
+    - Access to center-level reports and data
+    - Budget management for their center
+  </Step>
+
+  <Step title="Level 5: Administrators">
+    **Role Code:** `ADMCRIPSC`
+    
+    - Center-level administrative access
+    - Process and validate expense requests
+    - Generate reports for their center
+    - User support and assistance
+  </Step>
+
+  <Step title="Level 6: Department Chiefs">
+    **Role Code:** `JFDEPTO`
+    
+    - Department-level approval authority
+    - Manage department personnel
+    - Access to department reports
+  </Step>
+
+  <Step title="Level 7: Liaison Personnel">
+    **Role Code:** `ENLACE`
+    
+    - Coordinate request processing
+    - Data entry and validation
+    - Limited approval authority
+  </Step>
+
+  <Step title="Level 8: Researchers">
+    **Role Code:** `INVEST`
+    
+    - Create expense and travel requests
+    - View own requests and reports
+    - Submit documentation
+  </Step>
+</Steps>
+
+## Permission Types
+
+The system defines specific permission codes for different operations:
+
+<ParamField path="VIAT" type="string">
+  **Travel Allowance (Viáticos)**
+  
+  Permission to create and approve travel allowance requests. Date-based permission that must be renewed daily.
+</ParamField>
+
+<ParamField path="OFMAY" type="string">
+  **Major Official Documents**
+  
+  Permission to generate official documents with certain thresholds. Date-based, requires daily renewal.
+</ParamField>
+
+<ParamField path="EXT" type="string">
+  **External Access**
+  
+  Special permission for external users or consultants. Requires daily authorization.
+</ParamField>
+
+<ParamField path="EXTPROY" type="string">
+  **External Project Access**
+  
+  Permission for external users to access specific projects. Date-based and project-specific.
+</ParamField>
+
+<ParamField path="ADML" type="string">
+  **Local Administrator**
+  
+  Local administrative permissions for center-level management.
+</ParamField>
+
+<ParamField path="ADME" type="string">
+  **External Administrator**
+  
+  Administrative permissions for external consultants or contractors.
+</ParamField>
+
+## Permission Validation
+
+### Check User Permission
+
+The system validates permissions using the `obtienePermisos` method:
+
+```csharp
+string obtienePermisos(string psUsuario, string psPermiso, 
+                       string psProyecto = "", string psDep = "")
+{
+    string lsPermisos = "";
+    string lsQuery = "SELECT PERMISO FROM crip_permisos " +
+                     "WHERE CLV_USUARIO = '" + psUsuario + "' " +
+                     "AND PERMISO = '" + psPermiso + "' " +
+                     "AND ESTATUS = '1'";
+    
+    // Date-based permissions require current date validation
+    if ((psPermiso == "VIAT") || (psPermiso == "OFMAY") || 
+        (psPermiso == "EXT") || (psPermiso == "EXTPROY")) {
+        lsQuery += "AND FECHA = '" + lsHoy + "'";
+    }
+    
+    // Project-specific permissions
+    if (psProyecto != "") {
+        lsQuery += "AND CLV_PROY = '" + psProyecto + "'";
+    }
+    
+    // Department-specific permissions
+    if (psDep != "") {
+        lsQuery += "AND CLV_DEP_PROY = '" + psDep + "'";
+    }
+    
+    // Returns permission code if valid, empty string otherwise
+}
+```
+
+<Note>
+Time-sensitive permissions (VIAT, OFMAY, EXT, EXTPROY) are validated against the current date. These permissions expire daily and must be renewed by an authorizer.
+</Note>
+
+### Count Active Permissions
+
+Check how many active permissions a user has for a specific type:
+
+```csharp
+int obtieneCountPermisos(string psUsuario, string psPermiso)
+{
+    int lsPermisos = 0;
+    string lsQuery = "SELECT COUNT(*) AS COUNT FROM crip_permisos " +
+                     "WHERE CLV_USUARIO = '" + psUsuario + "' " +
+                     "AND FECHA = '" + lsHoy + "' " +
+                     "AND ESTATUS = '1' " +
+                     "AND PERMISO = '" + psPermiso + "'";
+    
+    // Returns count of active permissions for today
+}
+```
+
+### Get Permission Quantity
+
+Retrieve the number of operations allowed under a permission:
+
+```csharp
+int obtieneCantPermisos(string psUsuario, string psPermiso)
+{
+    string lsQuery = "SELECT CANTIDAD_PERMISOS FROM crip_permisos " +
+                     "WHERE CLV_USUARIO = '" + psUsuario + "' " +
+                     "AND FECHA = '" + lsHoy + "' " +
+                     "AND ESTATUS = '1' " +
+                     "AND PERMISO = '" + psPermiso + "'";
+    
+    // Returns quantity limit for the permission
+}
+```
+
+## Module Access Control
+
+### Department-Based Access
+
+Users can only access data from their assigned department(s):
+
+```csharp
+// Get users from specific department
+List<Entidad> ListaUsuariosDependencia(string psDep)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS CODIGO, " +
+                     "CONCAT(NOMBRE,' ',APELLIDO_PAT,' ',APELLIDO_MAT) AS DESCRIPCION " +
+                     "FROM vw_usuarios " +
+                     "WHERE DEPENDENCIA = '" + psDep + "'";
+}
+```
+
+### Role-Based Data Filtering
+
+The system uses role codes to filter accessible data:
+
+```csharp
+string Obtiene_Usuario(string psRol, string psDep = "", string psCargo = "")
+{
+    string lsQuery = "SELECT DISTINCT(USUARIO) AS USUARIO " +
+                     "FROM crip_job " +
+                     "WHERE ROL = '" + psRol + "' ";
+    
+    if (psDep != "") {
+        lsQuery += "AND CLV_DEP = '" + psDep + "'";
+    }
+    
+    if (psCargo != "") {
+        lsQuery += "AND CARGO = '" + psCargo + "'";
+    }
+    
+    lsQuery += "AND ESTATUS = '1' " +
+               "AND PERIODO = '" + lsYear + "'";
+}
+```
+
+## Hierarchical Permissions
+
+### VoBo (Approval) Authorization
+
+The system implements a "VoBo" (Visto Bueno / Approval) workflow:
+
+```csharp
+private string lsVobo = "VOBO";        // Approval role
+private string lsAutoriza = "AUTORIZA"; // Authorizer role
+
+public string VOBO
+{
+    get { return lsVobo; }
+}
+
+public string AUTORIZA
+{
+    get { return lsAutoriza; }
+}
+```
+
+### Approval Workflow
+
+<Steps>
+  <Step title="Request Creation">
+    User with `INVEST` role creates an expense or travel request.
+  </Step>
+
+  <Step title="VoBo Review">
+    Request is routed to the user's supervisor or department chief for initial approval (VoBo).
+  </Step>
+
+  <Step title="Administrative Review">
+    Administrator (`ADMCRIPSC`) validates the request against budget and policy.
+  </Step>
+
+  <Step title="Final Authorization">
+    Center Chief (`JFCCRIPSC`) or higher authority provides final authorization.
+  </Step>
+
+  <Step title="Processing">
+    Approved request is processed and payment/reimbursement is issued.
+  </Step>
+</Steps>
+
+## Permission Assignment Process
+
+### Creating New Permission
+
+Grant a new permission to a user:
+
+```csharp
+Boolean Insert_NuevoPermiso(string psUsuario, string psPermiso, 
+                            string psAutoriza, string psFecha, 
+                            string psObservaciones = "", 
+                            string psCantPermisos = "")
+{
+    string lsQuery = "INSERT INTO crip_permisos " +
+                     "(CLV_USUARIO, PERMISO, AUT_EXTERNO, CLV_PROY, " +
+                     "CLV_DEP_PROY, ESTATUS, FECHA, OBSERVACIONES, " +
+                     "CANTIDAD_PERMISOS) " +
+                     "VALUES (" +
+                     "'" + psUsuario + "', " +
+                     "'" + psPermiso + "', " +
+                     "'" + psAutoriza + "', " +
+                     "'1', '1', '1', " +
+                     "'" + clsFunciones.FormatFecha(psFecha) + "', " +
+                     "'" + psObservaciones + "', " +
+                     "'" + psCantPermisos + "')";
+    
+    // Execute insert and return success/failure
+}
+```
+
+<Warning>
+Permissions should only be granted by users with appropriate authorization levels. The `psAutoriza` parameter tracks who granted the permission for audit purposes.
+</Warning>
+
+### Permission Parameters
+
+<ParamField path="psUsuario" type="string" required>
+  User ID receiving the permission
+</ParamField>
+
+<ParamField path="psPermiso" type="string" required>
+  Permission type code (VIAT, EXT, ADML, etc.)
+</ParamField>
+
+<ParamField path="psAutoriza" type="string" required>
+  User ID of the person granting the permission
+</ParamField>
+
+<ParamField path="psFecha" type="string" required>
+  Date the permission is valid for (format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField path="psObservaciones" type="string">
+  Optional notes or justification for the permission
+</ParamField>
+
+<ParamField path="psCantPermisos" type="string">
+  Optional quantity limit for the permission
+</ParamField>
+
+## Permission Catalog
+
+### List Available Permissions
+
+Retrieve all available permission types:
+
+```csharp
+List<Entidad> ObtieneListPermisos()
+{
+    string lsQuery = "SELECT DISTINCT CLV_PERMISO AS CODIGO, " +
+                     "CLV_PERMISO AS DESCRIPCION " +
+                     "FROM crip_catalogo_permisos " +
+                     "WHERE ESTATUS = '1'";
+    
+    // Returns list of active permission types
+}
+```
+
+## Organizational Unit Permissions
+
+### Directorate-Level Access
+
+The system defines permissions for major organizational units:
+
+<ParamField path="DGAIA" type="string">
+  **Directorate General of Aquaculture Research and Innovation**
+  
+  Department code: `2000`
+  
+  Special permissions include access to aquaculture sub-directorate (`SUBACUA`).
+</ParamField>
+
+<ParamField path="DGAIPP" type="string">
+  **Directorate General of Fisheries Research in the Pacific**
+  
+  Department code: `4000`
+</ParamField>
+
+<ParamField path="DGAIPA" type="string">
+  **Directorate General of Fisheries Research in the Atlantic**
+  
+  Department code: `3000`
+</ParamField>
+
+<ParamField path="DA" type="string">
+  **Directorate of Administration**
+  
+  Department code: `5000`
+  
+  Includes sub-directorates: Informatics (5100), Financial (5200), Materials (5300), Human Resources (5100)
+</ParamField>
+
+<ParamField path="DG" type="string">
+  **General Directorate**
+  
+  Department code: `1000`
+  
+  Highest organizational level
+</ParamField>
+
+### Cross-Directorate Access
+
+Some roles have special cross-directorate permissions:
+
+```csharp
+if (psDep == Dictionary.DGAIA)
+{
+    lsQuery += "OR DEPENDENCIA = '" + Dictionary.SUBACUA + "'";
+}
+```
+
+This allows DGAIA users to also access SUBACUA (Aquaculture Sub-directorate) data.
+
+## Request Limits and Quotas
+
+### Daily Request Limits
+
+Check the number of requests submitted by a user today:
+
+```csharp
+int obtieneCountSolicitudes(string psUsuario)
+{
+    string lsQuery = "SELECT COUNT(*) AS COUNT FROM crip_comision " +
+                     "WHERE USUARIO = '" + psUsuario + "' " +
+                     "AND FECHA_SOL = '" + lsHoy + "'";
+    
+    // Returns count of requests submitted today
+}
+```
+
+<Note>
+This can be used to implement daily quotas or rate limiting for request submission.
+</Note>
+
+## Project-Specific Permissions
+
+Permissions can be scoped to specific projects and project departments:
+
+```csharp
+// Validate permission for specific project
+string permisoProyecto = obtienePermisos(
+    psUsuario: "JLOPEZ",
+    psPermiso: "EXTPROY",
+    psProyecto: "PROJ2024-001",
+    psDep: "4000"
+);
+```
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Validate permissions on every request">
+    Always check user permissions before allowing access to sensitive operations or data.
+  </Step>
+
+  <Step title="Implement time-based expiration">
+    Use date-based validation for temporary or elevated permissions.
+  </Step>
+
+  <Step title="Log permission grants and revocations">
+    Maintain audit trail of who granted permissions and when.
+  </Step>
+
+  <Step title="Use least privilege principle">
+    Grant only the minimum permissions necessary for users to perform their job functions.
+  </Step>
+
+  <Step title="Regular permission reviews">
+    Periodically review and revoke unnecessary permissions, especially for inactive users.
+  </Step>
+</Steps>
+
+## Permission Validation Example
+
+Complete example of validating and using permissions:
+
+```csharp
+// Check if user has travel allowance permission
+string hasViatPermission = MngDatosPermisos.obtienePermisos(
+    psUsuario: Session["Usuario"].ToString(),
+    psPermiso: "VIAT",
+    psProyecto: "",
+    psDep: Session["Ubicacion"].ToString()
+);
+
+if (hasViatPermission == "VIAT")
+{
+    // Check quantity limit
+    int cantidadPermisos = MngDatosPermisos.obtieneCantPermisos(
+        Session["Usuario"].ToString(),
+        "VIAT"
+    );
+    
+    // Check how many used today
+    int solicitudesHoy = MngDatosPermisos.obtieneCountSolicitudes(
+        Session["Usuario"].ToString()
+    );
+    
+    if (solicitudesHoy < cantidadPermisos)
+    {
+        // User can create travel request
+        // Proceed with request creation
+    }
+    else
+    {
+        // Quota exceeded
+        ShowError("Daily travel request limit exceeded");
+    }
+}
+else
+{
+    // No permission
+    ShowError("You do not have permission to create travel requests");
+}
+```
+
+## Database Schema
+
+### Permission Tables
+
+**crip_permisos** - Active permissions
+- Stores granted permissions with date and quantity limits
+- Status field for activation/deactivation
+- Links to user, project, and authorizer
+
+**crip_catalogo_permisos** - Permission catalog
+- Master list of available permission types
+- Permission codes and descriptions
+- Active/inactive status
+
+**crip_job** - User role assignments
+- Links users to roles and departments
+- Period-based for historical tracking
+- Status field for active assignments
+
+**vw_usuarios** - User view with permissions
+- Consolidated view of users with role and department information
+- Filtered by active status and current period
+- Used for permission validation queries

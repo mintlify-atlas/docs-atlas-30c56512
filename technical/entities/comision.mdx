@@ -1,0 +1,560 @@
+---
+title: 'Comision Entity'
+description: 'Travel assignment entity with approval workflow, transportation, budget allocation, and expense management'
+---
+
+## Overview
+
+The `Comision` class represents a travel assignment (comisión) for federal employees. It captures the complete lifecycle of a travel request from initial solicitation through approval workflow, transportation arrangements, budget allocation, and expense tracking.
+
+```csharp
+namespace InapescaWeb.Entidades
+{
+    public class Comision
+    {
+        // 100+ properties managing all aspects of travel assignments
+    }
+}
+```
+
+**Source:** `InapescaWeb.Entidades/Comision.cs`
+
+## Request Identification
+
+### Core Identifiers
+
+<ParamField path="Folio" type="string">
+  Unique travel assignment folio number (e.g., "2024-001")
+</ParamField>
+
+<ParamField path="Oficio" type="string">
+  Official document number for the travel authorization
+</ParamField>
+
+<ParamField path="Oficio_DG" type="string">
+  Official document number from the General Director (Dirección General)
+</ParamField>
+
+<ParamField path="Oficio_DGAIPP" type="string">
+  Official document number from DGAIPP (Dirección General de Administración, Innovación y Planeación de Proyectos)
+</ParamField>
+
+<ParamField path="Secuencia" type="string">
+  Sequence number for tracking multiple related travel assignments
+</ParamField>
+
+## Workflow Dates
+
+### Request and Approval Timeline
+
+<ParamField path="Fecha_Solicitud" type="string">
+  Date when the travel request was submitted
+</ParamField>
+
+<ParamField path="Fecha_Responsable" type="string">
+  Date when the project manager reviewed the request
+</ParamField>
+
+<ParamField path="Fecha_Vobo" type="string">
+  Date of VoBo (visto bueno) approval from supervising authority
+</ParamField>
+
+<ParamField path="Fecha_Autoriza" type="string">
+  Date when final authorization was granted
+</ParamField>
+
+### Travel Period
+
+<ParamField path="Fecha_Inicio" type="string">
+  Start date of the travel assignment
+</ParamField>
+
+<ParamField path="Fecha_Final" type="string">
+  End date of the travel assignment
+</ParamField>
+
+<ParamField path="Inicio_Comision" type="string">
+  Specific start time of the assignment (hour)
+</ParamField>
+
+<ParamField path="Fin_Comision" type="string">
+  Specific end time of the assignment (hour)
+</ParamField>
+
+<ParamField path="Dias_Total" type="string">
+  Total days for the travel assignment (calendar days)
+</ParamField>
+
+<ParamField path="Dias_Reales" type="string">
+  Actual working days for the assignment
+</ParamField>
+
+<ParamField path="Dias_Pagar" type="string">
+  Billable days to be paid for per diem
+</ParamField>
+
+## Personnel and Organization
+
+### Requestor Information
+
+<ParamField path="Usuario_Solicita" type="string">
+  Username of the employee requesting the travel assignment
+</ParamField>
+
+<ParamField path="Comisionado" type="string">
+  Name of the commissioned employee (traveler)
+</ParamField>
+
+<ParamField path="Ubicacion_Comisionado" type="string">
+  Organizational location/office of the commissioned employee
+</ParamField>
+
+### Approval Chain
+
+<ParamField path="Responsable_proyecto" type="string">
+  Project manager responsible for approving the travel request
+</ParamField>
+
+<ParamField path="Vobo" type="string">
+  Name of the authority providing VoBo (supervisory approval)
+</ParamField>
+
+<ParamField path="Autoriza" type="string">
+  Name of the final authorizing official
+</ParamField>
+
+<ParamField path="Ubicacion_Autoriza" type="string">
+  Organizational location of the authorizing official
+</ParamField>
+
+### Organizational Context
+
+<ParamField path="Ubicacion" type="string">
+  Primary organizational unit for this assignment
+</ParamField>
+
+<ParamField path="Area" type="string">
+  Specific department or area code
+</ParamField>
+
+## Destination and Purpose
+
+### Location Information
+
+<ParamField path="Lugar" type="string">
+  Destination city or location name
+</ParamField>
+
+<ParamField path="Estado" type="string">
+  Destination state (within Mexico)
+</ParamField>
+
+<ParamField path="Pais" type="string">
+  Destination country (for international travel)
+</ParamField>
+
+<ParamField path="Territorio" type="string">
+  Territory classification (national, international, rural, etc.)
+</ParamField>
+
+### Assignment Purpose
+
+<ParamField path="Objetivo" type="string">
+  Objective and purpose of the travel assignment
+</ParamField>
+
+<ParamField path="Tipo_Comision" type="string">
+  Type of commission (regular, extraordinary, maritime, etc.)
+</ParamField>
+
+<ParamField path="Actividad" type="string">
+  Specific activity to be performed
+</ParamField>
+
+### Fisheries-Specific Fields
+
+<ParamField path="Pesqueria" type="string">
+  Fishery type (INAPESCA-specific for fisheries research)
+</ParamField>
+
+<ParamField path="Especie" type="string">
+  Species being studied or managed
+</ParamField>
+
+<ParamField path="Producto" type="string">
+  Fishery product type
+</ParamField>
+
+## Budget and Project Allocation
+
+### Project Information
+
+<ParamField path="Proyecto" type="string">
+  Project code to which this travel is charged
+</ParamField>
+
+<ParamField path="Dep_Proy" type="string">
+  Department or location code for the project
+</ParamField>
+
+### Budget Classification
+
+<ParamField path="Capitulo" type="string">
+  Budget chapter (capítulo presupuestal)
+</ParamField>
+
+<ParamField path="Partida_Presupuestal" type="string">
+  Budget line item (partida presupuestal) for the overall assignment
+</ParamField>
+
+<ParamField path="Proceso" type="string">
+  Business process code
+</ParamField>
+
+<ParamField path="Indicador" type="string">
+  Performance indicator code
+</ParamField>
+
+## Transportation Details
+
+### Requested Transportation
+
+<ParamField path="Clase_Trans" type="string">
+  Requested transportation class (terrestrial, air, maritime)
+</ParamField>
+
+<ParamField path="Tipo_Trans" type="string">
+  Requested transportation type within the class
+</ParamField>
+
+<ParamField path="Vehiculo_Solicitado" type="string">
+  Specific vehicle requested
+</ParamField>
+
+<ParamField path="Ubicacion_Transporte" type="string">
+  Location where the vehicle is based
+</ParamField>
+
+### Authorized Transportation
+
+<ParamField path="Clase_Aut" type="string">
+  Authorized transportation class
+</ParamField>
+
+<ParamField path="Tipo_Aut" type="string">
+  Authorized transportation type
+</ParamField>
+
+<ParamField path="Vehiculo_Autorizado" type="string">
+  Specific vehicle authorized for use
+</ParamField>
+
+<ParamField path="Ubicacion_Trans_Aut" type="string">
+  Location of the authorized vehicle
+</ParamField>
+
+<ParamField path="Descrip_vehiculo" type="string">
+  Description of the vehicle (make, model, plates)
+</ParamField>
+
+### Route Information
+
+<ParamField path="Origen_Terrestre" type="string">
+  Origin and destination for land transportation
+</ParamField>
+
+<ParamField path="Origen_Aereo" type="string">
+  Origin and destination for air transportation
+</ParamField>
+
+<ParamField path="Origen_Dest_Acu" type="string">
+  Origin and destination for water/maritime transportation
+</ParamField>
+
+<ParamField path="Ruta" type="string">
+  Detailed route description
+</ParamField>
+
+## Air Travel Details
+
+### Departure Flight
+
+<ParamField path="Aerolinea_Part" type="string">
+  Airline for departure flight
+</ParamField>
+
+<ParamField path="Vuelo_Part_Num" type="string">
+  Departure flight number
+</ParamField>
+
+<ParamField path="Fecha_Vuelo_part" type="string">
+  Departure flight date
+</ParamField>
+
+<ParamField path="Hora_Vuelo_Part" type="string">
+  Departure flight time
+</ParamField>
+
+### Return Flight
+
+<ParamField path="Aerolinea_Ret" type="string">
+  Airline for return flight
+</ParamField>
+
+<ParamField path="Vuelo_Ret_Num" type="string">
+  Return flight number
+</ParamField>
+
+<ParamField path="Fecha_Vuelo_Ret" type="string">
+  Return flight date
+</ParamField>
+
+<ParamField path="Hora_Vuelo_ret" type="string">
+  Return flight time
+</ParamField>
+
+## Fuel and Tolls
+
+### Fuel Allocation
+
+<ParamField path="Combustible_Solicitado" type="string">
+  Amount of fuel requested (liters or cost)
+</ParamField>
+
+<ParamField path="Combustible_Autorizado" type="string">
+  Amount of fuel authorized
+</ParamField>
+
+<ParamField path="Partida_Combustible" type="string">
+  Budget line item for fuel expenses
+</ParamField>
+
+<ParamField path="Pago_Combustible" type="string">
+  Payment method for fuel
+</ParamField>
+
+<ParamField path="Combustible_Efectivo" type="string">
+  Fuel amount paid in cash
+</ParamField>
+
+<ParamField path="Combustible_Vales" type="string">
+  Fuel amount paid with vouchers
+</ParamField>
+
+<ParamField path="Vale_Comb_I" type="string">
+  Starting fuel voucher number
+</ParamField>
+
+<ParamField path="Vale_Comb_F" type="string">
+  Ending fuel voucher number
+</ParamField>
+
+### Toll Charges
+
+<ParamField path="Peaje" type="string">
+  Toll/highway fee amount
+</ParamField>
+
+<ParamField path="Partida_Peaje" type="string">
+  Budget line item for tolls
+</ParamField>
+
+### Passenger Fares
+
+<ParamField path="Pasaje" type="string">
+  Passenger fare/ticket cost
+</ParamField>
+
+<ParamField path="Partida_Pasaje" type="string">
+  Budget line item for passenger fares
+</ParamField>
+
+## Per Diem (Viaticos)
+
+### Per Diem Calculation
+
+<ParamField path="Zona_Comercial" type="string">
+  Commercial zone classification (determines per diem rate)
+</ParamField>
+
+<ParamField path="Tipo_Viaticos" type="string">
+  Type of per diem (commercial, rural, navigated, etc.)
+</ParamField>
+
+<ParamField path="Total_Viaticos" type="string">
+  Total per diem amount
+</ParamField>
+
+<ParamField path="Forma_Pago_Viaticos" type="string">
+  Payment method for per diem
+</ParamField>
+
+<ParamField path="Tipo_Pago_Viatico" type="string">
+  Type of per diem payment (advance, reimbursement)
+</ParamField>
+
+### Per Diem Day Types
+
+<ParamField path="Dias_Comercial" type="string">
+  Days in commercial zones (higher per diem rate)
+</ParamField>
+
+<ParamField path="Dias_Rural" type="string">
+  Days in rural zones (different per diem rate)
+</ParamField>
+
+<ParamField path="Dias_Navegados" type="string">
+  Days at sea (maritime assignments)
+</ParamField>
+
+<ParamField path="Dias_50" type="string">
+  Days more than 50km from base (special rate)
+</ParamField>
+
+<ParamField path="Singladuras" type="string">
+  Singladuras (24-hour maritime periods) for navigation assignments
+</ParamField>
+
+## Equipment and Resources
+
+<ParamField path="Equipo" type="string">
+  Equipment and resources needed for the assignment
+</ParamField>
+
+## Status and Notes
+
+<ParamField path="Estatus" type="string">
+  Current status of the travel assignment (pending, approved, completed, etc.)
+</ParamField>
+
+<ParamField path="Observaciones_Solicitud" type="string">
+  Comments and observations from the requestor
+</ParamField>
+
+<ParamField path="Observaciones_Vobo" type="string">
+  Comments from the VoBo approver
+</ParamField>
+
+<ParamField path="Observaciones_Autoriza" type="string">
+  Comments from the final authorizer
+</ParamField>
+
+## Document Management
+
+<ParamField path="Archivo" type="string">
+  Filename of the attached travel request document
+</ParamField>
+
+<ParamField path="Archivo_Ampliacion" type="string">
+  Filename of the extension/amendment document
+</ParamField>
+
+<ParamField path="Oficio_Ampliacion" type="string">
+  Official document number for travel extension
+</ParamField>
+
+<ParamField path="Periodo" type="string">
+  Fiscal period or year for the assignment
+</ParamField>
+
+## Usage Example
+
+```csharp
+using InapescaWeb.Entidades;
+
+// Create a new travel assignment request
+var comision = new Comision
+{
+    Folio = "2024-045",
+    Fecha_Solicitud = "2024-03-15",
+    Usuario_Solicita = "juan.lopez",
+    Comisionado = "María González Pérez",
+    Ubicacion_Comisionado = "CRIP-SC",
+    
+    // Destination
+    Lugar = "Mazatlán",
+    Estado = "Sinaloa",
+    Pais = "México",
+    
+    // Travel dates
+    Fecha_Inicio = "2024-04-10",
+    Fecha_Final = "2024-04-15",
+    Dias_Total = "6",
+    Dias_Reales = "5",
+    
+    // Purpose
+    Objetivo = "Participación en taller de capacitación sobre gestión pesquera sustentable",
+    Tipo_Comision = "Regular",
+    Actividad = "Capacitación",
+    
+    // Budget
+    Proyecto = "PRY-2024-001",
+    Partida_Presupuestal = "3811",
+    
+    // Transportation
+    Clase_Trans = "Aéreo",
+    Tipo_Trans = "Comercial",
+    Origen_Aereo = "Oaxaca - Mazatlán",
+    
+    // Per diem
+    Zona_Comercial = "Zona 2",
+    Tipo_Viaticos = "Comercial",
+    Total_Viaticos = "7500.00",
+    Dias_Comercial = "5",
+    
+    Estatus = "Pendiente"
+};
+
+// The entity can now be passed to the business logic layer
+// for validation and persistence
+```
+
+## Validation Rules
+
+<Warning>
+  The entity itself does not enforce validation. Validation logic should be implemented in the business logic layer.
+</Warning>
+
+### Required Fields
+
+- `Folio` - Unique identifier required
+- `Fecha_Solicitud` - Request date required
+- `Usuario_Solicita` - Requestor required
+- `Comisionado` - Traveler name required
+- `Fecha_Inicio` and `Fecha_Final` - Travel period required
+- `Lugar` - Destination required
+- `Objetivo` - Purpose required
+- `Proyecto` - Project allocation required
+
+### Business Rules
+
+1. **Date Logic**: `Fecha_Final` must be after `Fecha_Inicio`
+2. **Day Calculation**: `Dias_Total` should match the date range
+3. **Budget Allocation**: Valid `Proyecto` and `Partida_Presupuestal` required
+4. **Transportation Match**: Authorized transportation should align with requested or provide justification
+5. **Per Diem Calculation**: Total per diem should match days × daily rate for zone
+6. **Approval Sequence**: Dates should progress: Solicitud → Responsable → Vobo → Autoriza
+
+## Related Entities
+
+<CardGroup cols={2}>
+  <Card title="ComisionDetalle" icon="list">
+    Detailed financial breakdown of commission expenses
+  </Card>
+  <Card title="Itinerario" icon="plane">
+    Flight itinerary information for air travel
+  </Card>
+  <Card title="DatosComprobacion" icon="receipt" href="./comprobacion">
+    Expense verification data after travel completion
+  </Card>
+  <Card title="Usuario" icon="user" href="./usuario">
+    User information for requestors and approvers
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Entity Overview](./overview) - Entity layer architecture
+- [Approval Workflow](../business-logic/approval-workflow) - Commission approval process
+- [Budget Management](../business-logic/budget) - Project and budget allocation rules
+- [Travel Types](../reference/travel-types) - Commission type classifications

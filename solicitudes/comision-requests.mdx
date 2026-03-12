@@ -1,0 +1,586 @@
+---
+title: 'Travel Commission Requests'
+description: 'Complete guide for creating and managing travel commission requests in SMAF'
+---
+
+## Overview
+
+Travel commission requests (Solicitud de Comisión) are used to authorize official travel and associated expenses for INAPESCA personnel. The system supports national and international travel with comprehensive budget tracking and approval workflows.
+
+## Accessing the Request Form
+
+Navigate to **Solicitudes > Solicitud de Comisión** from the main menu. The request form uses a multi-view wizard with the following sections:
+
+1. Program/Project Selection
+2. Commissioned Personnel
+3. Destination and Dates
+4. Transportation
+5. Equipment and Final Review
+
+## Step-by-Step Process
+
+<Steps>
+  <Step title="Select Program/Project">
+    ### Program Assignment
+    
+    Choose the program or project that will fund the travel expenses.
+    
+    <ParamField path="dplDep" type="dropdown">
+      **Administrative Unit** (if applicable)
+      
+      For users with elevated permissions (Director General, Director Adjunto, Administrator), select the administrative unit where the program is located.
+    </ParamField>
+    
+    <ParamField path="dplProyectos" type="dropdown" required>
+      **Program/Project**
+      
+      Select from available programs based on your role and permissions. The list shows programs where you are:
+      - Program responsible
+      - Center director
+      - Administrator with appropriate permissions
+    </ParamField>
+    
+    ### Program Details (If Required)
+    
+    For research programs (non-602 component), additional fields appear:
+    
+    <ParamField path="dplEspecies" type="dropdown">
+      **Species/Fishery**
+      
+      Select the species or fishery related to this commission.
+    </ParamField>
+    
+    <ParamField path="dplProductos" type="dropdown" required>
+      **Institutional Goals (Metas)**
+      
+      Select up to 3 institutional goals. Click "Limpiar Lista" to clear selections.
+    </ParamField>
+    
+    <ParamField path="dplActividad" type="dropdown" required>
+      **Specific Activity**
+      
+      Select the specific activity within the program component.
+    </ParamField>
+    
+    <Note>
+      Component 602 programs (administrative) do not require species/product/activity selection.
+    </Note>
+  </Step>
+  
+  <Step title="Add Commissioned Personnel">
+    ### Personnel Selection
+    
+    <ParamField path="dplUsuarios" type="dropdown" required>
+      **Type of Commissioners**
+      
+      - **INT (Comisionados locales)**: Personnel from your same center
+      - **EXT (Comisionados Otros Centros)**: Personnel from other INAPESCA centers
+    </ParamField>
+    
+    #### For Local Commissioners (INT)
+    
+    <ParamField path="dplPersonal" type="dropdown">
+      **Commissioner Name**
+      
+      Select personnel from your center. For INVESTIGADOR, ADMINISTRADOR, JEFE_CENTRO, and ENLACE roles, your name is automatically included.
+    </ParamField>
+    
+    #### For External Commissioners (EXT)
+    
+    <Warning>
+      External commissioner selection requires EXT permission in your user profile, or you must be the project responsible.
+    </Warning>
+    
+    <ParamField path="dplUbicacion" type="dropdown">
+      **Center**
+      
+      Select the external center where the commissioner is based.
+    </ParamField>
+    
+    <ParamField path="dplPersonal" type="dropdown">
+      **Commissioner Name**
+      
+      Select from personnel at the chosen center.
+    </ParamField>
+    
+    ### Adding Commissioners
+    
+    Click **Agregar** to add the selected person to the commission. The system validates:
+    
+    - No duplicate commissioners
+    - Maximum 3 pending expense verifications (unless VIAT permission granted)
+    - Annual day limits not exceeded (unless OFMAY permission granted)
+    - No pending verifications older than 10 days (unless VIAT permission granted)
+    
+    <Note>
+      Director-level roles (DIRECTOR_GRAL, DIRECTOR_JURIDICO, DIRECTOR_ADMINISTRACION, DIRECTOR_ADJUNTO) are exempt from verification count restrictions.
+    </Note>
+  </Step>
+  
+  <Step title="Configure Destination and Dates">
+    ### Commission Extension (Optional)
+    
+    <ParamField path="chkAMpliacion" type="checkbox">
+      **Ampliación de Comisión**
+      
+      Check if this is an extension to an existing commission. When checked:
+      
+      - Enter the original commission reference number
+      - Format: `RJL-INAPESCA-[Centro de Costo]-[Num. Oficio]-[Año]`
+      - Only the original commissioner can request extensions
+    </ParamField>
+    
+    ### Commission Type and Location
+    
+    <ParamField path="dplTipoComision" type="dropdown" required>
+      **Commission Type**
+      
+      - **NACIONAL**: Domestic travel within Mexico
+      - **INTERNACIONAL**: International travel (Director roles only)
+    </ParamField>
+    
+    #### For National Commissions
+    
+    <ParamField path="txtLugar" type="text" required>
+      **Destination**
+      
+      Enter the destination city or location (max 250 characters).
+    </ParamField>
+    
+    <ParamField path="dplEstado" type="dropdown" required>
+      **State**
+      
+      Select the destination state within Mexico.
+    </ParamField>
+    
+    #### For International Commissions
+    
+    <ParamField path="txtPais" type="text" required>
+      **Country**
+      
+      Enter the destination country (max 250 characters).
+    </ParamField>
+    
+    <ParamField path="txtLugar" type="text" required>
+      **Destination**
+      
+      Enter the city or location within the country.
+    </ParamField>
+    
+    ### Travel Dates
+    
+    <ParamField path="txtInicio" type="date" required>
+      **Start Date (Del día)**
+      
+      Click the calendar icon to select commission start date.
+    </ParamField>
+    
+    <ParamField path="txtFinal" type="date" required>
+      **End Date (Al día)**
+      
+      Click the calendar icon to select commission end date.
+    </ParamField>
+    
+    <Warning>
+      The system calculates total days and validates against annual limits. Special OFMAY permission required to exceed configured annual day limits.
+    </Warning>
+    
+    ### Commission Objective
+    
+    <ParamField path="txtObjetivo" type="textarea" required>
+      **Objetivo de la comisión**
+      
+      Enter the business objective and justification for this travel (max 250 characters).
+      
+      **Example:**
+      ```
+      REALIZAR MUESTREOS BIOLOGICOS Y PESQUEROS DE LA ESPECIE 
+      CAMARON EN LA ZONA COSTERA DEL GOLFO DE CALIFORNIA PARA 
+      ESTABLECER VEDAS Y REGULACIONES PESQUERAS
+      ```
+    </ParamField>
+  </Step>
+  
+  <Step title="Select Transportation">
+    ### Transport Class and Type
+    
+    <ParamField path="dplDep1" type="dropdown">
+      **Transport Location**
+      
+      For official vehicles, select the administrative unit where the vehicle is assigned.
+    </ParamField>
+    
+    <ParamField path="dplClase" type="dropdown" required>
+      **Transport Class**
+      
+      - **OFICIAL**: Official government vehicles
+      - **PARTICULAR**: Personal vehicle
+      - **COMERCIAL**: Commercial transportation
+    </ParamField>
+    
+    <ParamField path="dplTipo" type="dropdown" required>
+      **Transport Type**
+      
+      Options vary based on selected class:
+      - TERRESTRE (Ground)
+      - AEREO (Air)
+      - ACUATICO (Water)
+    </ParamField>
+    
+    ### Official Vehicles
+    
+    When **OFICIAL** class is selected:
+    
+    <ParamField path="dplVehiculo" type="dropdown">
+      **Vehicle**
+      
+      Select from available official vehicles at the chosen location.
+    </ParamField>
+    
+    ### Fuel and Expenses
+    
+    <ParamField path="txtCombust" type="number">
+      **Combustible**
+      
+      Estimated fuel cost (in Mexican pesos).
+    </ParamField>
+    
+    <ParamField path="txtPasajes" type="number">
+      **Pasajes**
+      
+      Cost of tickets/fares for commercial transportation.
+    </ParamField>
+    
+    <ParamField path="txtPeaje" type="number">
+      **Peaje**
+      
+      Estimated toll road costs.
+    </ParamField>
+    
+    ### Route Information
+    
+    Based on transport type, provide route details:
+    
+    <ParamField path="txtRecorridoTerrestre" type="text">
+      **Recorrido Terrestre**
+      
+      Ground route (e.g., "MAZATLAN - CULIACAN - GUASAVE")
+    </ParamField>
+    
+    <ParamField path="TxtRecorridoAereo" type="text">
+      **Recorrido Aereo**
+      
+      Flight route (e.g., "MEXICO CITY - MONTERREY")
+    </ParamField>
+    
+    <ParamField path="txtRecorridoAcuatico" type="text">
+      **Recorrido Acuatico**
+      
+      Water route (e.g., "PUERTO VALLARTA - ISLAS MARIAS")
+    </ParamField>
+    
+    ### Additional Observations
+    
+    <ParamField path="txtObserVehiculo" type="textarea">
+      **Observaciones de Transporte**
+      
+      Any additional transportation notes or requirements (max 255 characters).
+    </ParamField>
+  </Step>
+  
+  <Step title="Equipment and Finalize">
+    ### Equipment Authorization
+    
+    <ParamField path="txtEquipo" type="textarea">
+      **Equipo a utilizar**
+      
+      List any institutional equipment to be used during the commission (max 255 characters).
+      
+      **Example:**
+      ```
+      GPS GARMIN, CAMARA FOTOGRAFICA CANON T7, 
+      MEDIDOR MULTIPARAMETRICO YSI, RED DE ARRASTRE
+      ```
+    </ParamField>
+    
+    ### Commission Observations
+    
+    <ParamField path="txtObservaciones" type="textarea">
+      **Observaciones de Comisión**
+      
+      General observations or special requirements for the commission.
+    </ParamField>
+    
+    ### Submit Request
+    
+    Click **GENERAR** to submit the commission request. The system will:
+    
+    1. Validate all required fields
+    2. Check budget availability
+    3. Verify annual limits and pending verifications
+    4. Generate a unique sequence number
+    5. Create the official request for approval workflow
+    
+    <Note>
+      After submission, the request enters the approval workflow. You can track its status in the "Autorizaciones" module.
+    </Note>
+  </Step>
+</Steps>
+
+## Form Fields Reference
+
+### Core Request Fields (from Comision.cs)
+
+<ParamField path="Folio" type="string">
+  Unique request identifier, auto-generated upon final authorization
+</ParamField>
+
+<ParamField path="Fecha_Solicitud" type="date">
+  Request submission timestamp
+</ParamField>
+
+<ParamField path="Usuario_Solicita" type="string">
+  RFC of the user who created the request
+</ParamField>
+
+<ParamField path="Ubicacion" type="string">
+  Administrative unit code of the requester
+</ParamField>
+
+<ParamField path="Proyecto" type="string">
+  Project/program code for budget allocation
+</ParamField>
+
+<ParamField path="Dep_Proy" type="string">
+  Administrative unit where the project is located
+</ParamField>
+
+<ParamField path="Tipo_Comision" type="string">
+  Commission type: NACIONAL or INTERNACIONAL
+</ParamField>
+
+<ParamField path="Pais" type="string">
+  Destination country (for international commissions)
+</ParamField>
+
+<ParamField path="Estado" type="string">
+  Destination state code (for national commissions)
+</ParamField>
+
+<ParamField path="Lugar" type="string">
+  Destination city or location
+</ParamField>
+
+<ParamField path="Fecha_Inicio" type="date">
+  Commission start date
+</ParamField>
+
+<ParamField path="Fecha_Final" type="date">
+  Commission end date
+</ParamField>
+
+<ParamField path="Objetivo" type="string">
+  Commission objective and justification
+</ParamField>
+
+<ParamField path="Clase_Trans" type="string">
+  Transport class: OFICIAL, PARTICULAR, COMERCIAL
+</ParamField>
+
+<ParamField path="Tipo_Trans" type="string">
+  Transport type: TERRESTRE, AEREO, ACUATICO
+</ParamField>
+
+<ParamField path="Vehiculo_Solicitado" type="string">
+  Requested vehicle identifier (for official transport)
+</ParamField>
+
+<ParamField path="Ubicacion_Transporte" type="string">
+  Location code of the transport unit
+</ParamField>
+
+<ParamField path="Combustible_Solicitado" type="decimal">
+  Requested fuel amount in pesos
+</ParamField>
+
+<ParamField path="Pasaje" type="decimal">
+  Commercial ticket/fare cost
+</ParamField>
+
+<ParamField path="Peaje" type="decimal">
+  Toll road costs
+</ParamField>
+
+<ParamField path="Origen_Terrestre" type="string">
+  Ground route description
+</ParamField>
+
+<ParamField path="Origen_Aereo" type="string">
+  Flight route description
+</ParamField>
+
+<ParamField path="Origen_Dest_Acu" type="string">
+  Water route description
+</ParamField>
+
+<ParamField path="Equipo" type="string">
+  Equipment list
+</ParamField>
+
+<ParamField path="Observaciones_Solicitud" type="string">
+  General observations
+</ParamField>
+
+<ParamField path="Comisionado" type="string">
+  RFC of commissioned personnel
+</ParamField>
+
+<ParamField path="Ubicacion_Comisionado" type="string">
+  Administrative unit of the commissioner
+</ParamField>
+
+## Validation Rules
+
+The system performs extensive validation based on code in `Solicitud_Comision.aspx.cs:655-1100`:
+
+### Commissioner Validation
+
+```csharp
+// Check pending verifications (line 780)
+int contNoComp = Comisiones_SinComprobar(dplPersonal.SelectedValue, year);
+
+if (contNoComp >= 3 && lsPermisosEspecialesVIAT != "VIAT") {
+    // Block request
+}
+```
+
+<Warning>
+  Commissioners cannot be added if they have 3+ pending expense verifications, unless they have VIAT special permission.
+</Warning>
+
+### Annual Day Limits
+
+```csharp
+// Check annual limits (line 792)
+double totalDias = Dias_Acumulados(dplPersonal.SelectedValue, year);
+
+if (totalDias >= DIAS_ANUALES) {
+    if (lsPermisosEspeciales != "OFMAY") {
+        // Block request
+    }
+}
+```
+
+<Note>
+  Users exceeding annual day limits require OFMAY (Oficio Mayor) special permission from Administration.
+</Note>
+
+### 10-Day Verification Rule
+
+```csharp
+// Check verification timing (line 716-719)
+string ultimaFechaComision = Obtiene_Max_Comision_Comprobar(rfc);
+DIFERENCIA = (DateTime.Today > ultimaFechaComision.AddDays(10));
+
+if (DIFERENCIA && contNoComp > 0 && lsPermisosVIAT == null) {
+    // Block request
+}
+```
+
+## Code Examples
+
+### Form Validation (txtProyectos button click)
+
+```csharp
+protected void btnProyectos_Click(object sender, EventArgs e)
+{
+    if (dplProyectos.SelectedValue != string.Empty)
+    {
+        Proyecto objProyecto = MngNegocioProyecto.ObtieneDatosProy(
+            lsUbicPrograma, 
+            programa, 
+            year
+        );
+
+        if (objProyecto.Componente == "602")
+        {
+            // Administrative component - skip species/product selection
+            clsFuncionesGral.Activa_Paneles(pnlEspecie, false);
+            mvComision.ActiveViewIndex = 2;
+        }
+        else
+        {
+            // Research component - require product selection
+            if (gvProductos.Rows.Count == 0)
+            {
+                ClientScript.RegisterStartupScript(
+                    this.GetType(), 
+                    "Inapesca", 
+                    "alert('Debe seleccionar un producto especifico');", 
+                    true
+                );
+                return;
+            }
+            mvComision.ActiveViewIndex = 2;
+        }
+    }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot add external commissioners">
+    **Issue**: "No cuenta con los permisos necesarios" error when selecting EXT type.
+    
+    **Solution**: 
+    - Verify you have EXT permission in Catalogos > Permisos
+    - Confirm you are listed as project responsible
+    - Contact administrator to grant EXT permission
+  </Accordion>
+  
+  <Accordion title="Commissioner blocked due to pending verifications">
+    **Issue**: "El comisionado tiene 3 o mas comprobaciones pendientes"
+    
+    **Solution**:
+    - Complete pending expense reports in Comprobaciones module
+    - Request VIAT special permission from Administration if urgent
+  </Accordion>
+  
+  <Accordion title="Annual day limit exceeded">
+    **Issue**: "Ha excedido el total de dias anuales permitidos"
+    
+    **Solution**:
+    - Review accumulated days in current calendar year
+    - Request OFMAY special permission for justifiable exceptions
+    - Wait until next calendar year for limit reset
+  </Accordion>
+  
+  <Accordion title="Cannot select international commission">
+    **Issue**: INTERNACIONAL option not available in commission type dropdown
+    
+    **Solution**:
+    - International commissions restricted to DIRECTOR_ADMINISTRACION and DIRECTOR_GRAL roles
+    - Request role escalation or have director submit on your behalf
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Approval Workflow" icon="check" href="/autorizaciones">
+    Track and manage request approvals
+  </Card>
+  
+  <Card title="Expense Verification" icon="receipt" href="/comprobaciones">
+    Submit expense reports after travel
+  </Card>
+  
+  <Card title="User Permissions" icon="key" href="/catalogos/permisos">
+    Configure special permissions (VIAT, OFMAY, EXT)
+  </Card>
+  
+  <Card title="Budget Management" icon="coins" href="/presupuesto">
+    View project budgets and allocations
+  </Card>
+</CardGroup>

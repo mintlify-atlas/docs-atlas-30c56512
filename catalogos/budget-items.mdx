@@ -1,0 +1,553 @@
+---
+title: 'Budget Item Management'
+description: 'Managing PEF classifications and partidas presupuestales in SMAF'
+---
+
+## Overview
+
+Budget Item Management in SMAF handles two critical catalog types:
+
+1. **PEF (Presupuesto de Egresos de la Federación)**: The federal budget classifications imported from the annual federal budget decree
+2. **Partidas Presupuestales**: Specific budget line items assigned to projects for expense tracking
+
+These catalogs form the foundation of SMAF's expense control and ensure compliance with federal budgetary regulations.
+
+<Note>
+PEF management is restricted to Director de Administración, Director General, and authorized financial staff (Subdirector Adjunto with Financiero position). Budget item assignment to projects is available to all administrators.
+</Note>
+
+## PEF (Presupuesto de Egresos de la Federación)
+
+### What is PEF?
+
+The PEF is Mexico's annual federal budget, approved by Congress, that establishes spending authority for all government agencies. SMAF imports PEF data to ensure all expenses are charged against authorized budget classifications.
+
+### PEF Structure
+
+The federal budget uses a complex classification system:
+
+<ParamField path="UR" type="string">
+  Unidad Responsable - Responsible Unit code
+</ParamField>
+
+<ParamField path="UE" type="string">
+  Unidad Ejecutora - Executing Unit code
+</ParamField>
+
+<ParamField path="EDO" type="string">
+  Estado - State/geographic location code
+</ParamField>
+
+<ParamField path="FI" type="string">
+  Finalidad - Purpose classification
+</ParamField>
+
+<ParamField path="FU" type="string">
+  Función - Function classification
+</ParamField>
+
+<ParamField path="SF" type="string">
+  Subfunción - Subfunction classification
+</ParamField>
+
+<ParamField path="RG" type="string">
+  Región - Region code
+</ParamField>
+
+<ParamField path="AI" type="string">
+  Actividad Institucional - Institutional Activity
+</ParamField>
+
+<ParamField path="PP" type="string">
+  Programa Presupuestario - Budget Program
+</ParamField>
+
+<ParamField path="CP" type="string">
+  Componente Presupuestario - Budget Component
+</ParamField>
+
+<ParamField path="PARTIDA" type="string">
+  Partida Específica - Specific budget line item (e.g., "3801" for national travel)
+</ParamField>
+
+<ParamField path="TG" type="string">
+  Tipo de Gasto - Type of expenditure (current, capital, etc.)
+</ParamField>
+
+<ParamField path="FF" type="string">
+  Fuente de Financiamiento - Funding source
+</ParamField>
+
+<ParamField path="PPI" type="string">
+  Programa Presupuestario Institucional - Institutional Budget Program
+</ParamField>
+
+## Importing PEF Data
+
+### Access Requirements
+
+Navigate to **Catálogos > PEF**. Access is validated:
+
+```csharp
+if ((lsRol == Dictionary.DIRECTOR_ADMINISTRACION) | 
+    (lsRol == Dictionary.DIRECTOR_GRAL) |
+    ((lsRol == Dictionary.SUBDIRECTOR_ADJUNTO) & (lsPuesto == Dictionary.PUESTO_FINANCIERO)))
+{
+    // Access granted
+}
+else
+{
+    Response.Redirect("../Home/Home.aspx", true);
+}
+```
+
+### One-Time Import Rule
+
+The PEF can only be imported once per fiscal year:
+
+```csharp
+int objPef = MngNegocioPef.Obtiene_pef();
+
+if (objPef >= 1)
+{
+    clsFuncionesGral.Activa_Paneles(Panel1, false);
+    lblTitle.Text = "Ya existe cargado un pef para este año, " +
+                    "si desea agregar mas partidas al actual ingresar al " +
+                    "modulo de adecuaciones Pef";
+}
+else
+{
+    clsFuncionesGral.Activa_Paneles(Panel1, true);
+    lblTitle.Text = "Carga de archivo excel de pef anual " + Year;
+}
+```
+
+<Warning>
+Once the PEF is loaded for a fiscal year, the import interface is disabled. Additional budget items must be added through the Adecuaciones PEF module.
+</Warning>
+
+### Excel File Preparation
+
+<Steps>
+  <Step title="Obtain Federal Budget Data">
+    Acquire the official PEF allocation from SHCP (Secretaría de Hacienda y Crédito Público) for INAPESCA.
+  </Step>
+  
+  <Step title="Format Excel Workbook">
+    Organize data in an Excel file with the following structure:
+    
+    | Column | Field | Description |
+    |--------|-------|-------------|
+    | A | UR | Unidad Responsable |
+    | B | UE | Unidad Ejecutora |
+    | C | EDO | Estado |
+    | D | FI | Finalidad |
+    | E | FU | Función |
+    | F | SF | Subfunción |
+    | G | RG | Región |
+    | H | AI | Actividad Institucional |
+    | I | PP | Programa Presupuestario |
+    | J | CP | Componente Presupuestario |
+    | K | PARTIDA | Partida Específica |
+    | L | TG | Tipo de Gasto |
+    | M | FF | Fuente de Financiamiento |
+    | N | PPI | Programa Presupuestario Institucional |
+    | O | PEF | Total Annual Amount |
+    | P | ENERO | January allocation |
+    | Q | FEBRERO | February allocation |
+    | R | MARZO | March allocation |
+    | S | ABRIL | April allocation |
+    | T | MAYO | May allocation |
+    | U | JUNIO | June allocation |
+    | V | JULIO | July allocation |
+    | W | AGOSTO | August allocation |
+    | X | SEPTIEMBRE | September allocation |
+    | Y | OCTUBRE | October allocation |
+    | Z | NOVIEMBRE | November allocation |
+    | AA | DICIEMBRE | December allocation |
+  </Step>
+  
+  <Step title="Validate Data">
+    Ensure:
+    - All classification codes match federal standards
+    - Monthly allocations sum to annual total
+    - No empty cells in required columns
+    - Numeric values for all budget amounts
+  </Step>
+  
+  <Step title="Name the Worksheet">
+    Note the exact name of the worksheet containing the data (e.g., "PEF2024").
+  </Step>
+</Steps>
+
+### Upload Process
+
+<Steps>
+  <Step title="Access PEF Module">
+    Navigate to **Catálogos > PEF**
+  </Step>
+  
+  <Step title="Select Excel File">
+    Click the file upload control and select your prepared Excel file.
+    
+    ```csharp
+    String fileExtension = System.IO.Path.GetExtension(FileUpload1.FileName).ToLower();
+    String[] allowedExtensions = { ".xlsx", ".xls" };
+    ```
+    
+    Supported formats: `.xlsx`, `.xls`
+  </Step>
+  
+  <Step title="Enter Worksheet Name">
+    In the "Nombre de Hoja excel a cargar" field, type the exact worksheet name.
+    
+    ```csharp
+    if ((lsHoja == null) | (lsHoja == ""))
+    {
+        alert('Debe indicar un nombre de hoja como aparece en su archivo de excel.');
+        return;
+    }
+    ```
+  </Step>
+  
+  <Step title="Upload">
+    Click the upload button (Excel icon) to begin import.
+  </Step>
+  
+  <Step title="Processing">
+    The system reads the Excel file and processes each row:
+    
+    ```csharp
+    ds = MngDatosPef.Lee_Excel_Pef(
+        Ruta + "/" + FileUpload1.FileName, 
+        lsHoja, 
+        fileExtension, 
+        FileUpload1.FileName
+    ).Tables[0];
+    
+    Carga_PEF(ds, FileUpload1.FileName);
+    ```
+  </Step>
+  
+  <Step title="Confirmation">
+    Success message appears: "PEF ha subido exitosamente."
+    
+    The interface is then disabled for the remainder of the fiscal year.
+  </Step>
+</Steps>
+
+### Import Logic
+
+The system processes each row of the Excel file:
+
+```csharp
+public static void Carga_PEF(DataTable pdtTable, string psNombre)
+{
+    int conta = 0;
+    foreach (DataRow row in pdtTable.Rows)
+    {
+        pef = new Pef();
+        conta = 0;
+        
+        foreach (var item in row.ItemArray)
+        {
+            switch (conta)
+            {
+                case 0: pef.UR = item.ToString(); break;
+                case 1: pef.UE = item.ToString(); break;
+                case 2: pef.EDO = item.ToString(); break;
+                case 3: pef.FI = item.ToString(); break;
+                case 4: pef.FU = item.ToString(); break;
+                case 5: pef.SF = item.ToString(); break;
+                case 6: pef.RG = item.ToString(); break;
+                case 7: pef.AI = item.ToString(); break;
+                case 8: pef.PP = item.ToString(); break;
+                case 9: pef.CP = item.ToString(); break;
+                case 10: pef.PARTIDA = item.ToString(); break;
+                case 11: pef.TG = item.ToString(); break;
+                case 12: pef.FF = item.ToString(); break;
+                case 13: pef.PPI = item.ToString(); break;
+                case 14: pef.PEF = item.ToString(); break;
+                case 15: pef.ENERO = item.ToString(); break;
+                case 16: pef.FEBRERO = item.ToString(); break;
+                case 17: pef.MARZO = item.ToString(); break;
+                case 18: pef.ABRIL = item.ToString(); break;
+                case 19: pef.MAYO = item.ToString(); break;
+                case 20: pef.JUNIO = item.ToString(); break;
+                case 21: pef.JULIO = item.ToString(); break;
+                case 22: pef.AGOSTO = item.ToString(); break;
+                case 23: pef.SEPTIEMBRE = item.ToString(); break;
+                case 24: pef.OCTUBRE = item.ToString(); break;
+                case 25: pef.NOVIEMBRE = item.ToString(); break;
+                case 26: pef.DICIEMBRE = item.ToString(); break;
+            }
+            conta++;
+        }
+        
+        // Insert based on whether PARTIDA is present
+        if ((pef.PARTIDA == null) | (pef.PARTIDA == Dictionary.CADENA_NULA))
+        {
+            MngNegocioPef.Inserta_Pef_Detalle(pef, "1", lsUsuario, psNombre);
+        }
+        else
+        {
+            MngNegocioPef.Inserta_Pef(pef, "1");
+        }
+    }
+}
+```
+
+### File Storage
+
+Uploaded files are stored in a year-specific directory:
+
+```csharp
+public static void Valida_Carpeta()
+{
+    string raiz = HttpContext.Current.Server.MapPath("..") + "\\CONTABLE\\";
+    if (!Directory.Exists(raiz + Year)) 
+        Directory.CreateDirectory(raiz + Year);
+    
+    Ruta = raiz + Year;
+    lsUbicacion = "CONTABLE/" + Year;
+}
+```
+
+Example path: `/InapescaWeb/CONTABLE/2024/PEF_2024.xlsx`
+
+## Budget Classifications
+
+### Chapter Structure (Capítulos)
+
+Budget items are organized into chapters following federal guidelines:
+
+<AccordionGroup>
+  <Accordion title="Chapter 1000: Personal Services">
+    Salaries, wages, and personnel benefits
+  </Accordion>
+  
+  <Accordion title="Chapter 2000: Materials and Supplies">
+    Office supplies, fuel, consumables
+  </Accordion>
+  
+  <Accordion title="Chapter 3000: General Services">
+    - **3801**: National Travel (Viáticos Nacionales)
+    - **3802**: International Travel (Viáticos al Extranjero)
+    - **3851**: Installation, Relocation, and Travel Expenses
+  </Accordion>
+  
+  <Accordion title="Chapter 4000: Transfers and Subsidies">
+    Grants and transfers to other entities
+  </Accordion>
+  
+  <Accordion title="Chapter 5000: Capital Goods">
+    Furniture, vehicles, equipment
+  </Accordion>
+  
+  <Accordion title="Chapter 6000: Public Works">
+    Construction and infrastructure
+  </Accordion>
+</AccordionGroup>
+
+### Partidas Presupuestales
+
+Specific budget line items used for expense tracking:
+
+| Partida | Description | Chapter | Typical Use |
+|---------|-------------|---------|-------------|
+| 3801 | Viáticos Nacionales | 3000 | Domestic travel expenses |
+| 3802 | Viáticos Internacionales | 3000 | International travel |
+| 3851 | Gastos de Instalación | 3000 | Relocation expenses |
+| 2141 | Materiales y Útiles | 2000 | Office supplies |
+| 2611 | Combustibles | 2000 | Fuel for vehicles |
+
+## Assigning Budget Items to Projects
+
+### Access
+
+Navigate to **Catálogos > Proyecto Partida** to assign budget items to projects.
+
+### Assignment Process
+
+<Steps>
+  <Step title="Select Administrative Unit">
+    Choose the CRIP or directorate containing the project.
+    
+    ```csharp
+    dplUnidadesAdministrativas.DataSource = MngNegocioAdscripcion.ObtieneCrips("1", "");
+    ```
+  </Step>
+  
+  <Step title="Select Project">
+    Choose the project to assign budget items.
+    
+    ```csharp
+    dplProyectos.DataSource = MngNegocioProyecto.ListaProyectoCrip(lsUnidad);
+    ```
+  </Step>
+  
+  <Step title="Select Component">
+    Choose the budget component (usually inherited from program).
+  </Step>
+  
+  <Step title="Select Chapter">
+    Choose the budget chapter (e.g., 3000 for General Services).
+    
+    ```csharp
+    protected void dplCapitulos_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        // Load sub-chapters for selected chapter
+        dplSUbCapitulo.DataSource = GetSubChapters(dplCapitulos.SelectedValue);
+    }
+    ```
+  </Step>
+  
+  <Step title="Select Sub-Chapter (if applicable)">
+    Some chapters have sub-categories.
+  </Step>
+  
+  <Step title="Select Partida">
+    Click the partida field to open the modal selector showing available budget items.
+    
+    ```csharp
+    <cc1:ModalPopupExtender 
+        ID="txtPartida_ModalPopupExtender" 
+        TargetControlID="txtPartida" 
+        PopupControlID="pnlPartidasPeaje" 
+        BackgroundCssClass="modalBackground"
+    />
+    ```
+  </Step>
+  
+  <Step title="Allocate Monthly Budgets">
+    Enter budget amounts for each month:
+    
+    - Enero (January)
+    - Febrero (February)
+    - Marzo (March)
+    - Abril (April)
+    - Mayo (May)
+    - Junio (June)
+    - Julio (July)
+    - Agosto (August)
+    - Septiembre (September)
+    - Octubre (October)
+    - Noviembre (November)
+    - Diciembre (December)
+    
+    <Note>
+    Monthly allocations enable time-based budget controls and prevent overspending in specific periods.
+    </Note>
+  </Step>
+  
+  <Step title="Save Assignment">
+    Click **Guardar** to save the budget item assignment.
+  </Step>
+</Steps>
+
+### Partida Selector Interface
+
+The modal popup displays budget items in a tree structure:
+
+```html
+<asp:Panel ID="pnlPartidasPeaje" runat="server" 
+    Style="display: none; background: white; width: 80%; height: auto">
+    <div class="modal-header">
+        <table border="0" width="100%">
+            <tr>
+                <td>Partidas Presupuestales Inapesca</td>
+                <td align="right">
+                    <asp:ImageButton ID="ImageButton4" runat="server" 
+                        ImageUrl="~/Resources/cancelar.gif" />
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="Contenedor">
+        <asp:TreeView ID="tvPartidasPeaje" runat="server" 
+            ShowCheckBoxes="None" 
+            ShowLines="false"
+            OnSelectedNodeChanged="tvPartidasPeaje_SelectedNodeChanged">
+        </asp:TreeView>
+    </div>
+</asp:Panel>
+```
+
+## Budget Control and Validation
+
+### Monthly Budget Tracking
+
+SMAF validates expenses against monthly allocations:
+
+1. **Monthly Caps**: Prevents charging expenses beyond the monthly budget
+2. **Cumulative Tracking**: Monitors year-to-date spending
+3. **Remaining Balance**: Shows available budget for each partida/month combination
+
+### Validation Rules
+
+<Warning>
+**Budget Validation Enforced:**
+- Cannot exceed monthly allocation for a partida
+- Cannot exceed annual allocation for a partida
+- Cannot use partidas not assigned to the project
+- Cannot charge to closed fiscal periods
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Validate PEF Before Import" icon="check-circle">
+    Cross-reference Excel data with official SHCP documentation before uploading.
+  </Card>
+  <Card title="Test with Sample Data" icon="flask">
+    Import a small subset first to verify column mapping and format.
+  </Card>
+  <Card title="Document Worksheet Names" icon="file-alt">
+    Keep a record of worksheet names used for each fiscal year's import.
+  </Card>
+  <Card title="Distribute Budgets Realistically" icon="calendar">
+    Allocate monthly budgets based on expected spending patterns, not uniform distribution.
+  </Card>
+</CardGroup>
+
+## Common Import Errors
+
+<AccordionGroup>
+  <Accordion title="Invalid file format">
+    **Error**: "Tipo de Archivo no valido."
+    
+    **Solution**: Ensure file extension is `.xlsx` or `.xls`. Save Excel files in compatible format, not CSV or other types.
+  </Accordion>
+  
+  <Accordion title="Worksheet name not found">
+    **Error**: Import fails silently or throws exception.
+    
+    **Solution**: Verify the worksheet name is entered exactly as it appears in Excel, including capitalization and spaces.
+  </Accordion>
+  
+  <Accordion title="PEF already loaded">
+    **Error**: "Ya existe cargado un pef para este año..."
+    
+    **Solution**: This is expected behavior. Use the Adecuaciones PEF module to add budget items after initial load.
+  </Accordion>
+  
+  <Accordion title="Column count mismatch">
+    **Error**: Import succeeds but data is misaligned.
+    
+    **Solution**: Ensure Excel has exactly 27 columns in the correct order. Do not add or remove columns.
+  </Accordion>
+</AccordionGroup>
+
+## Related Topics
+
+<CardGroup cols={3}>
+  <Card title="Programs" icon="list-check" href="/catalogos/programs">
+    Link programs to budget components
+  </Card>
+  <Card title="Projects" icon="folder-tree" href="/catalogos/projects">
+    Assign partidas to active projects
+  </Card>
+  <Card title="Expense Tracking" icon="money-bill-wave" href="/user-guide/expense-tracking">
+    Charge expenses against budget items
+  </Card>
+</CardGroup>

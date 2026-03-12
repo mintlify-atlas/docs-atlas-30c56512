@@ -1,0 +1,400 @@
+---
+title: 'Payment Processing'
+description: 'Step-by-step guide for processing travel allowance payments in SMAF'
+---
+
+# Processing Travel Allowance Payments
+
+This guide walks through the complete process of registering and processing payments for approved travel assignments in SMAF.
+
+## Prerequisites
+
+<Note>
+Before processing payments, ensure:
+- The travel assignment (comisión) has been approved
+- Financial approval has been granted
+- The commission is not already fully paid
+- You have Administrator or Center Chief role permissions
+</Note>
+
+## Payment Processing Steps
+
+<Steps>
+  <Step title="Select Travel Assignment">
+    Choose the travel assignment to pay from the list of approved commissions.
+    
+    The system displays pending commissions based on your location:
+    
+    ```csharp
+    gvFiscales.DataSource = MngNegocioPago.Comisiones_Pagar(
+        Session["Crip_Ubicacion"].ToString(), Year);
+    gvFiscales.DataBind();
+    ```
+    
+    Each commission displays:
+    - **Folio**: Assignment reference number
+    - **Usuario**: Employee ID
+    - **Nombre**: Employee name
+    - **Lugar**: Travel destination
+    - **Periodo**: Travel dates
+  </Step>
+
+  <Step title="Load Commission Details">
+    When you select a commission, the system loads complete details:
+    
+    ```csharp
+    Comision DetalleComision = MngNegocioComision.DetalleComision_Pagos(
+        archivo + ".pdf", 
+        Session["Crip_Ubicacion"].ToString(), 
+        usuario
+    );
+    
+    ComisionDetalle oCdetalle = MngNegocioComisionDetalle.Obtiene_detalle(
+        DetalleComision.Archivo, 
+        DetalleComision.Comisionado, 
+        DetalleComision.Ubicacion_Comisionado, 
+        Year
+    );
+    ```
+    
+    The system validates:
+    - Commission has requested amounts
+    - Not previously marked as paid
+    - Commission detail record exists
+  </Step>
+
+  <Step title="Select or Create Ministracion">
+    Associate the payment with a fund allocation (ministracion).
+    
+    ### Existing Ministracion
+    
+    If previous payments exist for this commission:
+    
+    ```csharp
+    List<Entidad> ListaMinistracion = 
+        MngNegocioMinistracion.Obtiene_Ministracion(Year, txtArchivoHiden.Text);
+    
+    if (ListaMinistracion.Count > 0)
+    {
+        dplMinistracion.DataSource = ListaMinistracion;
+        dplMinistracion.DataTextField = Dictionary.DESCRIPCION;
+        dplMinistracion.DataValueField = Dictionary.CODIGO;
+        dplMinistracion.DataBind();
+        Session["Crip_IsExistinMinistracion"] = "1";
+    }
+    ```
+    
+    ### New Ministracion
+    
+    If this is the first payment:
+    
+    ```csharp
+    else
+    {
+        clsFuncionesGral.Llena_Lista(dplMinistracion, 
+            clsFuncionesGral.ConvertMayus(
+                " = s e l e c c i o n e= |Nueva Ministracion"));
+        Session["Crip_IsExistinMinistracion"] = "0";
+    }
+    ```
+  </Step>
+
+  <Step title="Select Ministracion Type">
+    Choose the type of fund allocation from the dropdown.
+    
+    ```csharp
+    dplTipoMinistracion.DataSource = 
+        MngNegocioMinistracion.ListaTipoMinistracion("00");
+    dplTipoMinistracion.DataValueField = Dictionary.CODIGO;
+    dplTipoMinistracion.DataTextField = Dictionary.DESCRIPCION;
+    dplTipoMinistracion.DataBind();
+    ```
+    
+    <Warning>
+    You must select a ministracion type before payment panels are activated.
+    </Warning>
+  </Step>
+
+  <Step title="Enter Payment Amounts">
+    For each applicable expense category, enter the payment amount and budget line (partida presupuestal).
+    
+    ### Viáticos (Travel Allowances)
+    
+    ```csharp
+    if (pnlViaticos.Visible)
+    {
+        if ((txtViatpag.Text == "") | (txtViatpag.Text == ""))
+        {
+            ClientScript.RegisterStartupScript(this.GetType(), "Inapesca", 
+                "alert('Debe ingresar un valor de viaticos a pagar');", true);
+            return;
+        }
+        
+        if (!clsFuncionesGral.IsNumeric(txtViatpag.Text))
+        {
+            ClientScript.RegisterStartupScript(this.GetType(), "Inapesca", 
+                "alert('Valor de viaticos debe ser numerico.');", true);
+            return;
+        }
+        
+        if ((txtPartidaViaticos.Text == "") | (txtPartidaViaticos.Text == null))
+        {
+            ClientScript.RegisterStartupScript(this.GetType(), "Inapesca", 
+                "alert('Partida de Viaticos obligatoria');", true);
+            return;
+        }
+    }
+    ```
+    
+    The system displays:
+    - **Requested amount**: `lblViaticos` - Total originally requested
+    - **Previously paid**: `oCdetalle.Viaticos` - Amount already disbursed
+    - **New payment**: `txtViatpag` - Amount to pay now
+    - **Budget line**: `txtPartidaViaticos` - Accounting partition code
+    
+    This same pattern applies to all expense categories:
+    - Combustible (fuel)
+    - Peajes (tolls)
+    - Pasajes (transportation)
+    - Singladuras (maritime days)
+  </Step>
+
+  <Step title="Specify Payment Method and Bank Details">
+    Enter the payment method and bank account information.
+    
+    ### Payment Type
+    
+    ```csharp
+    lsFormaPago = dplTipoPago.SelectedValue.ToString();
+    ```
+    
+    ### Destination Bank Details
+    
+    <ParamField path="txtBanco" type="string" required>
+      Destination bank name
+    </ParamField>
+    
+    <ParamField path="txtCuenta" type="string" required>
+      Bank account number
+    </ParamField>
+    
+    <ParamField path="txtClabe" type="string" required>
+      CLABE interbank code (18 digits)
+    </ParamField>
+    
+    <ParamField path="txtReferencia" type="string" required>
+      Unique bank reference number for this payment
+    </ParamField>
+    
+    <ParamField path="txtFecha" type="date" required>
+      Payment date
+    </ParamField>
+    
+    ### Source Bank Details
+    
+    Select the originating bank account for the transfer:
+    
+    ```csharp
+    dplBancoOrigen.DataSource = 
+        MngNegocioCuentas.ListaBancos(Session["Crip_Ubicacion"].ToString());
+    dplBancoOrigen.DataValueField = Dictionary.CODIGO;
+    dplBancoOrigen.DataTextField = Dictionary.DESCRIPCION;
+    dplBancoOrigen.DataBind();
+    ```
+    
+    When a source bank is selected, account and CLABE are automatically populated:
+    
+    ```csharp
+    protected void dplBancoOrigen_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        string banco = dplBancoOrigen.SelectedValue.ToString();
+        CuentasBancarias ListaCuentas = 
+            MngNegocioCuentas.ListaCuentas(
+                Session["Crip_Ubicacion"].ToString(), banco);
+        
+        txtCuentaOrigen.Text = ListaCuentas.Cuenta;
+        txtClabeOrigen.Text = ListaCuentas.Clabe;
+    }
+    ```
+  </Step>
+
+  <Step title="Register Payment">
+    Click the "Registrar Pagos" button to process the payment.
+    
+    ```csharp
+    protected void btnPagar_Click(object sender, EventArgs e)
+    {
+        // Validation completed - process payment
+        if (Session["Crip_IsExistinMinistracion"].ToString() == "0")
+        {
+            // Create new ministracion
+            lsMinistracion = MngNegocioMinistracion.Obtiene_Max_Ministracion();
+        }
+        else
+        {
+            // Use existing ministracion
+            lsMinistracion = dplMinistracion.SelectedValue.ToString();
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Payment Calculation Logic
+
+The system calculates payment status based on requested vs. paid amounts.
+
+### New Ministracion Payment
+
+When creating a new ministracion, the system:
+
+1. **Creates ministracion detail record**:
+
+```csharp
+bool insert = MngNegocioMinistracion.Inserta_MInistracionDetalle(
+    dplTipoMinistracion.SelectedValue.ToString(), 
+    lsMinistracion, 
+    lsHoy, 
+    Year, 
+    Session["Crip_Usuario"].ToString(), 
+    Session["Crip_Ubicacion"].ToString(), 
+    Dictionary.FECHA_NULA, 
+    MngNegocioDependencia.Obtiene_DIrector_Financieros(
+        Dictionary.PUESTO_FINANCIERO, Dictionary.SUBDIRECTOR_ADJUNTO), 
+    // ... additional parameters
+);
+```
+
+2. **Creates payment record for each expense type**:
+
+```csharp
+if (clsFuncionesGral.Convert_Double(DetalleComision.Total_Viaticos) > 0)
+{
+    insert = MngNegocioMinistracion.Inserta_Ministracion(
+        dplTipoMinistracion.SelectedValue.ToString(),
+        MngNegocioMinistracion.Obtiene_ClvPeriodo(lsHoy, Year),
+        lsMinistracion,
+        lsHoy,
+        Year,
+        // ... employee and bank details
+        "17", // Viaticos code
+        "VIATICOS PARA LA COMISION A " + DetalleComision.Lugar + 
+            " DEL " + DetalleComision.Fecha_Inicio + 
+            " AL " + DetalleComision.Fecha_Final,
+        clsFuncionesGral.ConvertString(
+            clsFuncionesGral.Convert_Double(DetalleComision.Total_Viaticos)),
+        // ... amounts and budget codes
+    );
+}
+```
+
+3. **Updates commission detail with paid amount**:
+
+```csharp
+insert = MngNegocioComisionDetalle.UPdate_Monto_Pagado(
+    clsFuncionesGral.ConvertString(
+        clsFuncionesGral.Convert_Double(oCdetalle.Viaticos) + 
+        clsFuncionesGral.Convert_Double(txtViatpag.Text)
+    ), 
+    txtFecha.Text, 
+    txtPartidaViaticos.Text, 
+    "17", 
+    txtArchivoHiden.Text + ".pdf", 
+    txtUsuarioHiden.Text
+);
+```
+
+### Existing Ministracion Payment
+
+For additional payments to an existing ministracion:
+
+```csharp
+oMinistracion = MngNegocioMinistracion.Objeto_Ministracion(
+    txtArchivoHiden.Text, 
+    dplMinistracion.SelectedValue.ToString(), 
+    "17"
+);
+
+if ((clsFuncionesGral.Convert_Double(txtViatpag.Text)) > 0)
+{
+    viat = clsFuncionesGral.Convert_Double(oCdetalle.Viaticos) + 
+           clsFuncionesGral.Convert_Double(txtViatpag.Text);
+    
+    if (clsFuncionesGral.Convert_Double(oMinistracion.Total_Solicitado) == viat)
+    {
+        lsEstatusFinancieros = "2"; // Fully paid
+    }
+    else
+    {
+        lsEstatusFinancieros = "1"; // Partial payment
+    }
+}
+```
+
+## Payment Status Updates
+
+After payment registration, the system updates status:
+
+```csharp
+// Update ministracion status
+MngNegocioMinistracion.UpdateEstatusMinistracion(
+    "2", 
+    txtArchivoHiden.Text, 
+    dplMinistracion.SelectedValue.ToString(), 
+    "17"
+);
+
+// Update commission financial status
+MngNegocioComisionDetalle.UpdateEstatusFinancieros(
+    "2", 
+    txtArchivoHiden.Text + ".pdf", 
+    txtUsuarioHiden.Text, 
+    Year
+);
+```
+
+## Expense Category Codes
+
+The system uses specific codes for each expense type:
+
+| Code | Category | Description |
+|------|----------|-------------|
+| 17 | Viáticos | Daily travel allowances |
+| 6 | Combustible | Fuel reimbursement |
+| 7 | Peajes | Toll fees |
+| 8 | Pasajes | Transportation costs |
+
+## Validation Rules
+
+<Warning>
+The following validations must pass before payment registration:
+</Warning>
+
+1. **Amount Validation**: All payment amounts must be numeric and greater than zero
+2. **Budget Line Required**: Each payment category must have a budget partition code
+3. **Bank Details Complete**: All bank fields (bank, account, CLABE, reference) are mandatory
+4. **Ministracion Selected**: Must choose existing or create new ministracion
+5. **Payment Date**: Date field cannot be empty
+6. **Source Bank**: Must select originating bank account
+
+## Common Error Messages
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| "Esta comisiona fue sin viaticos" | Commission has no requested amounts | Cannot process payment - commission was for zero amount |
+| "Esta Comision ya fue pagada" | Financial status is already "2" | Use reimbursement module for additional payments |
+| "Debe ingresar un valor de viaticos a pagar" | Payment amount field is empty | Enter numeric payment amount |
+| "Partida de Viaticos obligatoria" | Budget line code missing | Enter budget partition code |
+| "Banco Origen Obligatorio" | No source bank selected | Select originating bank account |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fund Allocations" icon="coins" href="/ministraciones/overview">
+    Learn about ministraciones and budget tracking
+  </Card>
+  
+  <Card title="Payment Reports" icon="chart-line" href="/reportes/payments">
+    Generate payment reports and reconciliation
+  </Card>
+</CardGroup>

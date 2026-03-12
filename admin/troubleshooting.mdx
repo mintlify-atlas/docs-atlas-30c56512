@@ -1,0 +1,1065 @@
+---
+title: Troubleshooting Guide
+description: Common issues, error messages, and solutions for SMAF system administrators
+---
+
+## Overview
+
+This guide provides solutions to common issues encountered in SMAF, including login failures, database connection errors, file upload problems, XML validation errors, session timeouts, permission errors, and payment processing issues.
+
+## Login and Authentication Issues
+
+### Failed Login - User Not Found
+
+<Accordion title="Error: No se encuentra el usuario, validar datos">
+
+**Symptom:**
+User receives error message: "No se encuentra el usuario, validar datos"
+
+**Common Causes:**
+- Username does not exist in database
+- User account is inactive (ESTATUS = '0')
+- User not assigned to current fiscal year (PERIODO mismatch)
+- Username entered incorrectly
+
+**Solution Steps:**
+
+<Steps>
+
+<Step title="Verify user exists">
+```sql
+SELECT USSER, NOMBRE, APELLIDO_PAT, ESTATUS, PERIODO
+FROM crip_usuarios
+WHERE USSER = 'username';
+```
+</Step>
+
+<Step title="Check user status">
+```sql
+-- User must have ESTATUS = '1' and correct PERIODO
+SELECT * FROM vw_usuarios
+WHERE USSER = 'username'
+  AND ESTATUS = '1'
+  AND PERIODO = YEAR(CURDATE());
+```
+</Step>
+
+<Step title="Activate user if needed">
+```sql
+UPDATE crip_usuarios
+SET ESTATUS = '1',
+    PERIODO = YEAR(CURDATE())
+WHERE USSER = 'username';
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### Failed Login - Incorrect Password
+
+<Accordion title="Error: La contraseña es incorrecta">
+
+**Symptom:**
+User receives error: "La contraseña es incorrecta"
+
+**Common Causes:**
+- Password entered incorrectly
+- Password stored incorrectly in database
+- Encryption/decryption mismatch
+
+**Solution Steps:**
+
+```sql
+-- Check password hash
+SELECT USSER, PASSWORD
+FROM vw_usuarios
+WHERE USSER = 'username';
+
+-- Reset password using encryption utility
+-- Access: /Utilerias/Encriptador.aspx
+```
+
+**Password Reset Procedure:**
+
+<Steps>
+
+<Step title="Access password encryptor">
+Navigate to: `https://your-server/Utilerias/Encriptador.aspx`
+</Step>
+
+<Step title="Generate encrypted password">
+Enter new password and copy encrypted value
+</Step>
+
+<Step title="Update database">
+```sql
+UPDATE crip_job
+SET PASSWORD = 'encrypted_password_here'
+WHERE USUARIO = 'username';
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### Failed Login - Administrative Unit Mismatch
+
+<Accordion title="Error: Usuario no pertenece a la unidad administrativa">
+
+**Symptom:**
+Error: "El usuario Ingresado no pertenece a la unidad administrativa especificada o se encuentra dado de baja"
+
+**Common Causes:**
+- User not assigned to the selected administrative unit (DEPENDENCIA)
+- User has wrong CLV_DEP value
+- Missing entry in crip_job table
+
+**Solution:**
+
+```sql
+-- Verify user's administrative unit assignment
+SELECT 
+    u.USSER,
+    j.CLV_DEP,
+    d.DESCRIPCION as unidad_administrativa
+FROM crip_usuarios u
+INNER JOIN crip_job j ON u.USSER = j.USUARIO
+INNER JOIN crip_dependencia d ON j.CLV_DEP = d.CLV_DEP
+WHERE u.USSER = 'username';
+
+-- Assign user to correct unit
+UPDATE crip_job
+SET CLV_DEP = 'correct_clv_dep'
+WHERE USUARIO = 'username';
+```
+
+</Accordion>
+
+### Session Timeout Issues
+
+<Accordion title="Session expires too quickly">
+
+**Symptom:**
+Users are logged out after brief periods of inactivity
+
+**Session Configuration:**
+
+```csharp
+// Default session timeout: 20 minutes
+Session.Timeout = 20;
+```
+
+**Solutions:**
+
+<CodeGroup>
+
+```xml web.config - Increase timeout
+<system.web>
+  <sessionState timeout="30" mode="InProc" />
+</system.web>
+```
+
+```csharp Application code - Set timeout
+protected void Page_Load(object sender, EventArgs e)
+{
+    Session.Timeout = 30; // 30 minutes
+}
+```
+
+</CodeGroup>
+
+**Check session state:**
+
+```csharp
+if (Session["Version"] != null)
+{
+    // User is logged in
+}
+else
+{
+    // Session expired - redirect to login
+    Response.Redirect("../index.aspx");
+}
+```
+
+</Accordion>
+
+## Database Connection Errors
+
+### Connection String Decryption Failure
+
+<Accordion title="Cannot decrypt connection string">
+
+**Symptom:**
+Application fails to connect to database with decryption errors
+
+**Location:**
+`MngConexion.cs` - `getConexionMysql()` method
+
+```csharp
+string CadenaConexionEncriptada = ConfigurationManager.AppSettings["localhost"];
+string CadenaConexion = MngEncriptacion.decripString(CadenaConexionEncriptada);
+```
+
+**Common Causes:**
+- Corrupted encryption key
+- Wrong appSettings key name
+- Modified connection string in web.config
+
+**Solution:**
+
+<Steps>
+
+<Step title="Verify connection string key">
+```xml
+<!-- Check web.config for correct key -->
+<appSettings>
+  <add key="localhost" value="tGf1BXWYdXKSsk+PoraCYtfZx2CaCz+YSH7fEzln+tPCCIPyhXka5KxFVkYaJDYXUGY8BwEgL2KIww23CpBtBw==" />
+</appSettings>
+```
+</Step>
+
+<Step title="Re-encrypt connection string">
+Use `/Utilerias/Encriptador.aspx` to generate new encrypted connection string:
+
+```text
+Original: Server=localhost;Database=inapesca_cripsc;Uid=root;Pwd=password;
+Encrypted: [use encryptor to generate]
+```
+</Step>
+
+<Step title="Update web.config">
+Replace encrypted value in web.config and restart IIS
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### MySQL Connection Pool Exhaustion
+
+<Accordion title="Too many connections error">
+
+**Symptom:**
+Error: "Too many connections" or "Connection pool exhausted"
+
+**Diagnosis:**
+
+```sql
+-- Check current connections
+SHOW PROCESSLIST;
+
+-- Check max connections setting
+SHOW VARIABLES LIKE 'max_connections';
+
+-- Count connections by user
+SELECT user, COUNT(*) as connection_count
+FROM information_schema.processlist
+GROUP BY user;
+```
+
+**Solutions:**
+
+<Steps>
+
+<Step title="Increase max_connections">
+```sql
+SET GLOBAL max_connections = 500;
+```
+
+Make permanent in `/etc/mysql/my.cnf`:
+```ini
+[mysqld]
+max_connections = 500
+```
+</Step>
+
+<Step title="Check for connection leaks">
+Verify all connections are properly disposed:
+
+```csharp
+// Ensure disposeConexion is called
+MngConexion.disposeConexionSMAF(ConexionMysql);
+```
+</Step>
+
+<Step title="Kill idle connections">
+```sql
+-- Find idle connections
+SELECT id, user, host, db, time
+FROM information_schema.processlist
+WHERE command = 'Sleep'
+  AND time > 300;
+
+-- Kill specific connection
+KILL [connection_id];
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### Database Connection Refused
+
+<Accordion title="Can't connect to MySQL server">
+
+**Symptom:**
+"Can't connect to MySQL server on 'localhost'"
+
+**Quick Checks:**
+
+```bash
+# Check if MySQL is running
+systemctl status mysql
+
+# Start MySQL if stopped
+systemctl start mysql
+
+# Check MySQL is listening
+netstat -tlnp | grep 3306
+
+# Test connection
+mysql -u root -p -e "SELECT 1"
+```
+
+**Check MySQL error log:**
+
+```bash
+tail -f /var/log/mysql/error.log
+```
+
+</Accordion>
+
+## File Upload Problems
+
+### XML File Upload Failures
+
+<Accordion title="XML upload fails or validation errors">
+
+**Symptom:**
+XML files fail to upload or validate properly
+
+**Common Causes:**
+- File size exceeds maxRequestLength (50MB)
+- Invalid XML structure
+- Missing UUID or RFC fields
+- Unsupported CFDI version
+
+**Validation Requirements:**
+
+SMAF supports CFDI versions:
+- Version 3.3 (`cfdv33.cs`, `cfdiv33.cs`)
+- Version 4.0 (`cfdv4.cs`, `cfdiv4.cs`)
+
+**Solution Steps:**
+
+<Steps>
+
+<Step title="Verify file size">
+```xml
+<!-- Check web.config maxRequestLength (in KB) -->
+<httpRuntime maxRequestLength="50000" />
+
+<!-- Increase if needed -->
+<httpRuntime maxRequestLength="102400" /> <!-- 100MB -->
+```
+</Step>
+
+<Step title="Validate XML structure">
+Check XML contains required fields:
+- UUID (Timbre Fiscal)
+- RFC (Proveedor)
+- Fecha (Timbrado)
+- Total, Subtotal
+- Conceptos
+</Step>
+
+<Step title="Check XML storage">
+```bash
+# Verify XML directory permissions
+ls -la /var/www/InapescaWeb/XML/
+
+# Create year/user directory if missing
+mkdir -p /var/www/InapescaWeb/XML/2026/username
+chown IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/XML/2026/username
+chmod 755 /var/www/InapescaWeb/XML/2026/username
+```
+</Step>
+
+<Step title="Verify database insertion">
+```sql
+-- Check if XML was recorded
+SELECT * FROM crip_xml_detalle
+WHERE USUARIO = 'username'
+  AND DOCUMENTO = 'commission_number'
+ORDER BY FECH_EFF DESC;
+```
+</Step>
+
+</Steps>
+
+**XML Validation Error Messages:**
+
+```text
+Common errors:
+- "UUID duplicado" - UUID already exists
+- "RFC inválido" - Invalid tax ID format
+- "Versión CFDI no soportada" - Unsupported CFDI version
+- "Error al procesar conceptos" - Error processing line items
+```
+
+</Accordion>
+
+### PDF Document Upload Issues
+
+<Accordion title="PDF files won't upload or display">
+
+**Symptom:**
+PDF uploads fail or uploaded PDFs cannot be accessed
+
+**File Storage Structure:**
+
+```text
+/var/www/InapescaWeb/PDF/{Year}/{Center}/COMISIONES/{OficioNumber}/
+```
+
+**Troubleshooting:**
+
+<Steps>
+
+<Step title="Check directory permissions">
+```bash
+# Verify PDF directory exists and is writable
+ls -la /var/www/InapescaWeb/PDF/2026/
+
+# Fix permissions if needed
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/PDF
+chmod -R 755 /var/www/InapescaWeb/PDF
+```
+</Step>
+
+<Step title="Verify file was uploaded">
+```bash
+# Find recently uploaded PDFs
+find /var/www/InapescaWeb/PDF -name "*.pdf" -mtime -1 -ls
+
+# Check specific file
+ls -lh /var/www/InapescaWeb/PDF/2026/CRIP-SC/COMISIONES/RJL-*.pdf
+```
+</Step>
+
+<Step title="Check for file size issues">
+```bash
+# Find large PDFs that may cause issues
+find /var/www/InapescaWeb/PDF -name "*.pdf" -size +50M -ls
+```
+</Step>
+
+<Step title="Verify PDF generation code">
+Check `clsPdf.cs` for PDF generation errors:
+
+```csharp
+// PDF files are named: {Archivo}.pdf
+// Example: RJL-INAPESCA-CRIP-SC-001-2026.pdf
+string archivo = poComision.Archivo.Replace(".pdf", "");
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### File Upload Exceeds Size Limit
+
+<Accordion title="Request length exceeded error">
+
+**Symptom:**
+"Maximum request length exceeded" error
+
+**Current Limit:**
+
+```xml
+<httpRuntime maxRequestLength="50000" /> <!-- 50MB in KB -->
+```
+
+**Solution:**
+
+<Steps>
+
+<Step title="Increase IIS request size">
+```xml
+<!-- In web.config -->
+<system.web>
+  <httpRuntime maxRequestLength="102400" executionTimeout="3600" />
+</system.web>
+
+<system.webServer>
+  <security>
+    <requestFiltering>
+      <requestLimits maxAllowedContentLength="104857600" /> <!-- 100MB in bytes -->
+    </requestFiltering>
+  </security>
+</system.webServer>
+```
+</Step>
+
+<Step title="Restart IIS">
+```bash
+iisreset
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+## Payment Processing Errors
+
+### Payment Reference Generation Failure
+
+<Accordion title="Cannot generate payment reference">
+
+**Symptom:**
+Payment reference (referencia bancaria) fails to generate
+
+**Common Causes:**
+- Missing bank account information
+- Incorrect partida presupuestal
+- Database insertion error
+- Missing required fields
+
+**Solution:**
+
+<Steps>
+
+<Step title="Verify bank account configuration">
+```sql
+-- Check user's bank account
+SELECT 
+    j.USUARIO,
+    j.CUENTA_CONTABLE,
+    cb.BANCO,
+    cb.CUENTA
+FROM crip_job j
+LEFT JOIN crip_cuentas_bancarias cb ON j.CUENTA_CONTABLE = cb.CODIGO
+WHERE j.USUARIO = 'username';
+
+-- Add bank account if missing
+UPDATE crip_job
+SET CUENTA_CONTABLE = 'account_code'
+WHERE USUARIO = 'username';
+```
+</Step>
+
+<Step title="Check payment reference table">
+```sql
+-- Verify reference was created
+SELECT * FROM crip_referencia
+WHERE COMISIONADO = 'username'
+ORDER BY FECHA_GENERA DESC
+LIMIT 5;
+
+-- Check for errors in reference details
+SELECT * FROM crip_referenciaDetalles
+WHERE REF_BANCARIA = 'reference_number';
+```
+</Step>
+
+<Step title="Validate required fields">
+Ensure commission has all required data:
+
+```sql
+SELECT 
+    ARCHIVO,
+    COMISIONADO,
+    TOTAL_VIATICOS,
+    COMBUSTIBLE_EFECTIVO,
+    PASAJE,
+    PEAJE,
+    ESTATUS
+FROM crip_comision
+WHERE ARCHIVO = 'commission_file.pdf';
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### Payment Status Update Errors
+
+<Accordion title="Cannot update payment status">
+
+**Symptom:**
+Payment status fails to update from pending to paid
+
+**Database Tables Involved:**
+- `crip_referencia` - Payment references
+- `crip_comision_detalle` - Commission payment details
+
+**Solution:**
+
+```sql
+-- Check current payment status
+SELECT 
+    REF_BANCARIA,
+    ESTATUS,
+    IMPORTE,
+    IMPORTE_PAGADO,
+    FECHA_PAGO
+FROM crip_referencia
+WHERE REF_BANCARIA = 'reference_number';
+
+-- Update payment status manually
+UPDATE crip_referencia
+SET ESTATUS = '2',
+    IMPORTE_PAGADO = importe_value,
+    FECHA_PAGO = 'YYYY-MM-DD'
+WHERE REF_BANCARIA = 'reference_number';
+
+-- Update commission detail status
+UPDATE crip_comision_detalle
+SET ESTATUS = '2'
+WHERE ARCHIVO = 'commission_file.pdf'
+  AND COMISIONADO = 'username';
+```
+
+</Accordion>
+
+## Commission Processing Issues
+
+### Commission Approval Workflow Stuck
+
+<Accordion title="Commission stuck in approval process">
+
+**Symptom:**
+Commission not advancing through approval workflow
+
+**Approval Statuses:**
+- `0` - Inactive/Cancelled
+- `1` - Active/Pending
+- `2` - Approved
+- `3` - Completed
+
+**Solution:**
+
+<Steps>
+
+<Step title="Check commission status">
+```sql
+SELECT 
+    ARCHIVO,
+    USSER as solicitante,
+    ESTATUS,
+    FECHA_SOL,
+    FECHA_RESP,
+    FECHA_AUTORIZA,
+    LUGAR,
+    FECHA_I,
+    FECHA_F
+FROM crip_comision
+WHERE ARCHIVO = 'RJL-INAPESCA-XXX-###-2026.pdf';
+```
+</Step>
+
+<Step title="Check authorization dates">
+```sql
+-- Set authorization date if missing
+UPDATE crip_comision
+SET FECHA_AUTORIZA = CURDATE(),
+    ESTATUS = '2'
+WHERE ARCHIVO = 'commission_file.pdf'
+  AND ESTATUS = '1';
+```
+</Step>
+
+<Step title="Verify user permissions">
+```sql
+-- Check if user has authorization permissions
+SELECT 
+    u.USSER,
+    u.ROL,
+    p.NIVEL_AUTORIZACION,
+    p.PUEDE_AUTORIZAR
+FROM crip_usuarios u
+INNER JOIN crip_permisos p ON u.ROL = p.ROL
+WHERE u.USSER = 'authorizer_username';
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### Expense Verification (Comprobación) Errors
+
+<Accordion title="Cannot verify commission expenses">
+
+**Symptom:**
+Expense verification process fails or shows errors
+
+**Common Issues:**
+- Expense total exceeds advance amount
+- Missing required XML invoices
+- Reintegro (reimbursement) calculation incorrect
+- Status not updating
+
+**Solution:**
+
+<Steps>
+
+<Step title="Calculate reintegro amount">
+```sql
+-- Total advanced vs. expenses
+SELECT 
+    c.ARCHIVO,
+    (c.TOTAL_VIATICOS + c.COMBUSTIBLE_EFECTIVO + c.PEAJE + c.PASAJE) as total_avance,
+    COALESCE(SUM(x.TOTAL), 0) as total_comprobado,
+    (c.TOTAL_VIATICOS + c.COMBUSTIBLE_EFECTIVO + c.PEAJE + c.PASAJE) - COALESCE(SUM(x.TOTAL), 0) as reintegro
+FROM crip_comision c
+LEFT JOIN crip_xml_detalle x ON c.ARCHIVO = x.DOCUMENTO
+WHERE c.ARCHIVO = 'commission_file.pdf'
+GROUP BY c.ARCHIVO;
+```
+</Step>
+
+<Step title="Check verification status">
+```sql
+-- Verify comprobacion record exists
+SELECT * FROM crip_comision_comprobacion
+WHERE ARCHIVO = 'commission_file.pdf'
+  AND COMISIONADO = 'username';
+
+-- Create if missing
+INSERT INTO crip_comision_comprobacion
+(ARCHIVO, COMISIONADO, FECHA_COMPROBACION, ESTATUS)
+VALUES ('commission_file.pdf', 'username', CURDATE(), '1');
+```
+</Step>
+
+<Step title="Verify XML uploads">
+```sql
+-- Check all XML for commission
+SELECT 
+    UUID,
+    RFC,
+    CONCEPTO,
+    TOTAL,
+    PARTIDA,
+    ESTATUS
+FROM crip_xml_detalle
+WHERE DOCUMENTO = 'commission_file.pdf'
+ORDER BY FECH_EFF DESC;
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+## Permission and Access Errors
+
+### User Cannot Access Module
+
+<Accordion title="Access denied to module or feature">
+
+**Symptom:**
+User cannot access specific modules or features
+
+**Role-Based Access Control:**
+
+SMAF uses role-based permissions stored in Session:
+
+```csharp
+Session["Crip_Rol"]  // User role
+Session["Crip_Nivel"]  // User level
+Session["Crip_Ubicacion"]  // Administrative unit
+```
+
+**Solution:**
+
+<Steps>
+
+<Step title="Check user role">
+```sql
+SELECT 
+    USSER,
+    NOMBRE,
+    ROL,
+    NIVEL,
+    DEPENDENCIA as ubicacion
+FROM vw_usuarios
+WHERE USSER = 'username';
+```
+</Step>
+
+<Step title="Verify role permissions">
+```sql
+-- Check permissions for role
+SELECT * FROM crip_permisos
+WHERE ROL = 'user_role';
+
+-- Add permissions if needed
+INSERT INTO crip_permisos
+(ROL, MODULO, PUEDE_VER, PUEDE_CREAR, PUEDE_EDITAR, PUEDE_ELIMINAR)
+VALUES ('role_code', 'module_name', 1, 1, 0, 0);
+```
+</Step>
+
+<Step title="Update user role">
+```sql
+-- Assign different role
+UPDATE crip_job
+SET ROL = 'new_role_code'
+WHERE USUARIO = 'username';
+```
+</Step>
+
+</Steps>
+
+**Common Roles:**
+- `ADMINISTRADOR` - Full system access
+- `DIRECTOR_ADMINISTRACION` - Administrative director
+- `JEFE_CENTRO` - Center chief
+- `DIRECTOR_ADJUNTO` - Deputy director
+- `SUBDIRECTOR_ADJUNTO` - Assistant director
+- `INVESTIGADOR` - Researcher
+- `JEFE_DEPARTAMENTO` - Department head
+
+</Accordion>
+
+### File Permission Errors
+
+<Accordion title="Cannot write to directory">
+
+**Symptom:**
+Errors writing files to PDF or XML directories
+
+**Solution:**
+
+```bash
+# Fix directory ownership
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/PDF
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/XML
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/Images
+chown -R IIS_IUSRS:IIS_IUSRS /var/www/InapescaWeb/Excel
+
+# Set correct permissions
+chmod -R 755 /var/www/InapescaWeb/PDF
+chmod -R 755 /var/www/InapescaWeb/XML
+chmod -R 755 /var/www/InapescaWeb/Images
+chmod -R 755 /var/www/InapescaWeb/Excel
+
+# Verify permissions
+ls -la /var/www/InapescaWeb/
+```
+
+</Accordion>
+
+## Performance Issues
+
+### Slow Query Performance
+
+<Accordion title="Queries taking too long to execute">
+
+**Symptom:**
+Pages load slowly or timeout
+
+**Diagnosis:**
+
+```sql
+-- Enable slow query log
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 2;
+
+-- Check running queries
+SHOW PROCESSLIST;
+```
+
+**Common Slow Queries:**
+
+<Steps>
+
+<Step title="Identify slow queries">
+```bash
+mysqldumpslow -s t -t 10 /var/log/mysql/slow-query.log
+```
+</Step>
+
+<Step title="Add missing indexes">
+```sql
+-- Common indexes to add
+CREATE INDEX idx_comision_fecha ON crip_comision(FECHA_SOL);
+CREATE INDEX idx_comision_usuario ON crip_comision(USSER);
+CREATE INDEX idx_xml_documento ON crip_xml_detalle(DOCUMENTO);
+CREATE INDEX idx_xml_fecha ON crip_xml_detalle(FECH_EFF);
+CREATE INDEX idx_referencia_fecha ON crip_referencia(FECHA_GENERA);
+```
+</Step>
+
+<Step title="Optimize tables">
+```sql
+OPTIMIZE TABLE crip_comision;
+OPTIMIZE TABLE crip_xml_detalle;
+OPTIMIZE TABLE crip_referencia;
+ANALYZE TABLE crip_comision;
+```
+</Step>
+
+</Steps>
+
+</Accordion>
+
+### High Memory Usage
+
+<Accordion title="Application consuming excessive memory">
+
+**Symptom:**
+Server running out of memory, IIS application pool recycling frequently
+
+**Solution:**
+
+<Steps>
+
+<Step title="Check IIS application pool settings">
+```powershell
+# View current memory limits
+appcmd list apppool "SMAFAppPool" /text:recycling.periodicRestart.memory
+
+# Increase memory limit if needed
+appcmd set apppool "SMAFAppPool" /recycling.periodicRestart.memory:2097152
+```
+</Step>
+
+<Step title="Monitor MySQL memory">
+```sql
+SHOW VARIABLES LIKE '%buffer%';
+SHOW STATUS LIKE '%mem%';
+```
+</Step>
+
+<Step title="Check for memory leaks">
+- Review code for undisposed database connections
+- Check Session data size
+- Monitor large file uploads
+- Review caching strategy
+</Step>
+
+</Steps>
+
+</Accordion>
+
+## Emergency Procedures
+
+### System Unresponsive
+
+<Steps>
+
+<Step title="Check service status">
+```bash
+# Check MySQL
+systemctl status mysql
+
+# Check IIS
+appcmd list apppool
+```
+</Step>
+
+<Step title="Restart services">
+```bash
+# Restart MySQL
+systemctl restart mysql
+
+# Restart IIS application pool
+appcmd stop apppool /apppool.name:"SMAFAppPool"
+appcmd start apppool /apppool.name:"SMAFAppPool"
+
+# Or restart IIS completely
+iisreset
+```
+</Step>
+
+<Step title="Check logs">
+```bash
+# MySQL error log
+tail -100 /var/log/mysql/error.log
+
+# IIS logs
+tail -100 C:\inetpub\logs\LogFiles\W3SVC1\*.log
+
+# Application logs
+tail -100 /var/log/smaf/error.log
+```
+</Step>
+
+<Step title="Notify stakeholders">
+If system cannot be recovered quickly, notify users and escalate to senior administrators
+</Step>
+
+</Steps>
+
+## Getting Additional Help
+
+### Diagnostic Information to Collect
+
+When reporting issues, collect:
+
+<Accordion title="System Information">
+
+```bash
+# System info
+uname -a
+cat /etc/os-release
+
+# MySQL version
+mysql --version
+
+# IIS version
+appcmd list apppool
+
+# Disk space
+df -h
+
+# Memory usage
+free -h
+
+# Recent errors
+tail -100 /var/log/mysql/error.log
+tail -100 /var/log/smaf/error.log
+```
+
+</Accordion>
+
+### Support Contacts
+
+<CardGroup cols={2}>
+  <Card title="Technical Support" icon="headset">
+    For technical issues:
+    
+    INAPESCA IT Department
+    
+    soporte@inapesca.gob.mx
+  </Card>
+  <Card title="Database Issues" icon="database">
+    For database problems:
+    
+    Database Administrator
+    
+    dba@inapesca.gob.mx
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="System Monitoring" href="/admin/monitoring" icon="chart-line">
+    Proactive monitoring to prevent issues
+  </Card>
+  <Card title="Backup and Restore" href="/admin/backup-restore" icon="database">
+    Recover from data loss or corruption
+  </Card>
+</CardGroup>

@@ -1,0 +1,579 @@
+---
+title: International Travel Expenses
+description: Special requirements and procedures for verifying international travel expenses in SMAF
+---
+
+International travel expenses require special handling due to currency conversion, foreign documentation, and different fiscal regulations. This guide covers the complete process for verifying expenses incurred during international assignments.
+
+## Overview
+
+International travel in SMAF is identified by commercial zones **7** (USD) and **8** (EUR):
+
+- **Zone 7**: Travel to countries with USD currency (United States, other dollar zones)
+- **Zone 8**: Travel to countries with EUR currency (European Union, euro zones)
+
+<Note>
+International allowances are calculated in foreign currency and converted to MXN (Mexican Pesos) using official exchange rates at the time of travel approval.
+</Note>
+
+## International Allowance Calculation
+
+Unlike domestic travel with fixed peso rates, international allowances use:
+
+1. **Foreign currency daily rate** (Tarifa in USD or EUR)
+2. **Official exchange rate** (Tipo de Cambio)
+3. **Actual days** (Días Reales)
+4. **Days to pay** (Días Pagar) - may differ from actual days
+
+### Calculation Display
+
+The system displays international allowances differently:
+
+```csharp ComprobacionAdmin.aspx.cs:150-204
+if ((Zona_Comercial == "7") | (Zona_Comercial == "8"))
+{
+    // Get exchange rate data
+    TipoCambio tc = MngNegocioComision.TipoCambio(
+        Comisionado, 
+        Fecha_Vobo
+    );
+    
+    // Display foreign currency rate
+    if (tc.Denominacion == "USD")
+    {
+        tc4.Text = tc.Denominacion + " $ " + 
+                   Convert_Decimales(tc.Tarifa);
+    }
+    else // EUR
+    {
+        tc4.Text = tc.Denominacion + " € " + 
+                   Convert_Decimales(tc.Tarifa);
+    }
+    
+    // Display total in foreign currency
+    if (tc.Denominacion == "USD")
+    {
+        tc6.Text = "USD $ " + Convert_Decimales(
+            Convert_Double(tc.Tarifa) * 
+            Convert_Double(Dias_Pagar)
+        );
+    }
+    else
+    {
+        tc6.Text = "EUR € " + Convert_Decimales(
+            Convert_Double(tc.Tarifa) * 
+            Convert_Double(Dias_Pagar)
+        );
+    }
+    
+    // Display exchange rate
+    TableRow trUSD1 = new TableRow();
+    TableCell c51 = new TableCell();
+    c51.ColumnSpan = 5;
+    c51.HorizontalAlign = HorizontalAlign.Right;
+    c51.Text = "Tipo de Cambio a la Fecha: " + 
+               FormatFecha(tc.Fecha);
+    
+    TableCell c52 = new TableCell();
+    c52.Text = "MX $ " + Convert_Decimales(tc.Tipo_Cambio);
+}
+```
+
+### Example Calculation
+
+**Scenario**: 5-day research trip to Washington DC
+
+| Field | Value |
+|-------|-------|
+| Zone | 7 (USD) |
+| Daily Rate (Tarifa) | USD $250.00 |
+| Real Days | 5 |
+| Days to Pay | 5 |
+| **Foreign Total** | **USD $1,250.00** |
+| Exchange Rate Date | 2024-03-01 |
+| Exchange Rate | MX $17.25 / USD |
+| **MXN Equivalent** | **$21,562.50 MXN** |
+
+<Steps>
+  <Step title="Calculate foreign amount">
+    USD $250.00 × 5 days = **USD $1,250.00**
+  </Step>
+  
+  <Step title="Apply exchange rate">
+    USD $1,250.00 × MX $17.25 = **$21,562.50 MXN**
+  </Step>
+  
+  <Step title="Employee receives">
+    $21,562.50 MXN converted at bank rate (may vary slightly)
+  </Step>
+</Steps>
+
+## Exchange Rate Management
+
+Exchange rates are determined at travel approval (Vo.Bo.) time:
+
+```csharp
+public class TipoCambio
+{
+    public string Denominacion { get; set; }  // "USD" or "EUR"
+    public string Tarifa { get; set; }         // Daily rate in foreign currency
+    public string Tipo_Cambio { get; set; }    // MXN per foreign unit
+    public string Fecha { get; set; }          // Date rate was locked
+}
+```
+
+### Rate Sources
+
+Official exchange rates typically come from:
+
+1. **Banco de México** (primary source)
+2. **Diario Oficial de la Federación** (DOF)
+3. **SAT published rates**
+
+<Warning>
+Exchange rates are **locked at approval time** and do not change during expense verification, even if market rates fluctuate.
+</Warning>
+
+## International Expense Categories
+
+International expenses follow the same category codes as domestic, with special considerations:
+
+### Lodging (Hospedaje)
+
+<Tabs>
+  <Tab title="With Invoice">
+    **Best case**: Hotel provides formal invoice
+    
+    - Most international hotels can issue invoices
+    - May not be CFDI compliant (foreign vendors)
+    - Upload as PDF, enter details manually
+    - **No XML available** from foreign vendors
+  </Tab>
+  
+  <Tab title="Without Invoice">
+    **Common case**: Receipt only
+    
+    - Hotel provides basic receipt/confirmation
+    - Treat as **non-fiscal** expense if no RFC
+    - Subject to 10% limit
+    - Keep original receipt for audit
+  </Tab>
+</Tabs>
+
+### Meals (Alimentos)
+
+**Challenge**: Many foreign restaurants don't provide receipts
+
+<AccordionGroup>
+  <Accordion title="USA/Canada">
+    - Most restaurants provide detailed receipts
+    - Can be uploaded as supporting documentation
+    - Not CFDI compliant (no RFC, no UUID)
+    - Typically handled as non-fiscal (10% rule)
+  </Accordion>
+  
+  <Accordion title="Europe">
+    - VAT receipts common
+    - May include vendor tax ID (equivalent to RFC)
+    - Upload as PDF evidence
+    - Convert amounts to MXN
+  </Accordion>
+  
+  <Accordion title="Other Regions">
+    - Receipt standards vary widely
+    - Any written proof of expense helps
+    - Translate amounts to common currency
+    - Convert to MXN for submission
+  </Accordion>
+</AccordionGroup>
+
+### Transportation
+
+**Air Travel**:
+- E-tickets with full fare breakdown
+- Boarding passes as proof of travel
+- Convert foreign currency charges to MXN
+
+**Ground Transport**:
+- Taxi receipts (rarely available internationally)
+- Uber/Lyft email confirmations
+- Metro/transit cards
+
+**Rental Vehicles**:
+- Rental agreement and final invoice
+- Fuel receipts (important!)
+- Insurance charges
+
+## Currency Conversion for Expenses
+
+When submitting foreign currency expenses:
+
+<Steps>
+  <Step title="Identify expense currency">
+    Determine if expense was in USD, EUR, or local currency
+  </Step>
+  
+  <Step title="Apply conversion rate">
+    Use the **same exchange rate** as your allowance calculation
+    
+    ```csharp
+    // DO NOT use expense date rate
+    // DO use approval date rate for consistency
+    
+    double importeMXN = importeForeign * tipoCambioAprobacion;
+    ```
+  </Step>
+  
+  <Step title="Document conversion">
+    In observations field, note:
+    - Original amount and currency
+    - Exchange rate used
+    - Conversion date
+    
+    Example: `"USD $450.00 × MX $17.25 = $7,762.50 MXN"`
+  </Step>
+</Steps>
+
+<Note>
+Always use the **locked exchange rate** from your travel approval, not daily market rates or credit card conversion rates.
+</Note>
+
+## Foreign Invoices (Non-CFDI)
+
+Foreign vendors cannot issue Mexican CFDI invoices:
+
+### What to Upload
+
+```csharp ComprobacionSInXml.aspx.cs:558-586
+// Upload procedure for foreign invoices
+
+// 1. PDF of foreign invoice/receipt
+fuplPDF.PostedFile.SaveAs(Ruta + "/" + fuplPDF.FileName);
+
+// 2. NO XML file (foreign vendors don't have it)
+// fuplXML is empty for international expenses
+
+// 3. NO UUID (foreign invoices don't have Folio Fiscal)
+// Leave txtUUID empty or use placeholder like "FOREIGN-001"
+
+// 4. Manual entry required:
+//    - Invoice number from foreign document
+//    - Amount in MXN (after conversion)
+//    - Date of expense
+//    - Vendor name
+
+Inserta_Comprobacion_Comision(
+    Oficio, Archivo, Usuario, Ubicacion,
+    FechaGasto,          // Date from foreign invoice
+    Proyecto, Dep_Proy,
+    "2",                 // Still "fiscal" type
+    ClaveConcepto,       // e.g., "9" for lodging
+    Concepto,
+    fuplPDF.FileName,
+    ImporteMXN.ToString(), // Converted amount
+    "",                  // No XML file
+    "01", "01",
+    "Foreign invoice: " + NombreVendor + " | Original: " + 
+    ImporteOriginal + " " + Moneda,
+    NombreArchivo,
+    "",                  // No ticket
+    "INTL-" + NumeroFactura, // Pseudo-UUID for tracking
+    Periodo
+);
+```
+
+### Invoice Requirements
+
+Foreign invoices should include:
+
+<CardGroup cols={2}>
+  <Card title="Vendor Information" icon="building">
+    - Legal business name
+    - Tax identification number
+    - Business address
+    - Contact information
+  </Card>
+  
+  <Card title="Transaction Details" icon="file-invoice-dollar">
+    - Invoice number
+    - Date of service/purchase
+    - Detailed description
+    - Amount with currency code
+  </Card>
+  
+  <Card title="Tax Breakdown" icon="calculator">
+    - Subtotal
+    - Applicable taxes (VAT, sales tax, etc.)
+    - Total amount
+    - Tax registration numbers
+  </Card>
+  
+  <Card title="Payment Proof" icon="credit-card">
+    - Payment method
+    - Credit card last 4 digits
+    - Payment date
+    - Receipt/confirmation number
+  </Card>
+</CardGroup>
+
+## Special Cases
+
+### Mixed Currency Expenses
+
+**Scenario**: Travel to Europe with expenses in both EUR and GBP
+
+```csharp
+// Convert all to common currency first (EUR in this case)
+double gbpToEur = 1.17; // Example rate
+double expenseInEUR = expenseInGBP * gbpToEur;
+
+// Then convert EUR to MXN using locked rate
+double expenseInMXN = expenseInEUR * tipoCambioEURtoMXN;
+
+// Document in observations:
+// "Original: £125.00 GBP → €146.25 EUR (rate 1.17) → $3,073.25 MXN (rate 21.00)"
+```
+
+### Expenses in MXN During International Travel
+
+**Scenario**: Airport expenses in Mexico City before/after international flight
+
+<Warning>
+Expenses incurred in Mexico during international travel are **still subject to CFDI requirements** if domestic vendors.
+</Warning>
+
+```csharp
+// Mexico City airport restaurant (domestic vendor)
+if (vendorHasRFC)
+{
+    // Require CFDI invoice with XML
+    // Full domestic validation applies
+    requireXML = true;
+    requireUUID = true;
+}
+else
+{
+    // Foreign vendor at Mexican airport (rare)
+    // Treat as international
+    requireXML = false;
+}
+```
+
+### Transit Expenses (Stopovers)
+
+**Scenario**: Layover in Houston en route to final destination
+
+- Identify as **Zone 7** (USD) expense
+- Upload receipt from Houston
+- Convert USD → MXN
+- Note in observations: "Transit expense - Houston layover"
+
+## Per Diem vs. Actual Expenses
+
+International travel can use two models:
+
+### Per Diem Model (Viáticos)
+
+```csharp
+// Employee receives flat daily rate
+double dailyRate = 250.00; // USD
+int days = 5;
+double totalAllowance = dailyRate * days;
+
+// Employee does NOT need to prove meal expenses
+// Only lodging and transportation require receipts
+```
+
+**Advantages**:
+- Simplified accounting
+- No need to collect meal receipts
+- Predictable budgeting
+
+**Disadvantages**:
+- May not cover actual costs in expensive cities
+- Excess allowance must be reimbursed
+
+### Actual Expense Model (Devengados)
+
+```csharp
+if (Forma_Pago_Viaticos == VIATICOS_DEVENGADOS)
+{
+    // Employee must prove ALL expenses
+    // Paid only for actual documented costs
+    // No advance payment
+}
+```
+
+**Advantages**:
+- Exact cost recovery
+- No reimbursement issues
+- Better for unpredictable trips
+
+**Disadvantages**:
+- Employee must front all costs
+- Extensive documentation required
+- Complex verification process
+
+## International Travel Checklist
+
+<Steps>
+  <Step title="Before Travel">
+    <Accordion title="Confirm allowance details">
+      - ✓ Verify foreign currency rate
+      - ✓ Confirm exchange rate and lock date
+      - ✓ Calculate total MXN equivalent
+      - ✓ Understand per diem vs. actual expense model
+    </Accordion>
+  </Step>
+  
+  <Step title="During Travel">
+    <Accordion title="Collect documentation">
+      - ✓ Request detailed receipts (even if not "invoices")
+      - ✓ Keep credit card statements
+      - ✓ Photograph receipts as backup
+      - ✓ Note exchange rates if paying in cash
+      - ✓ Keep boarding passes and travel confirmations
+    </Accordion>
+  </Step>
+  
+  <Step title="After Travel">
+    <Accordion title="Prepare for verification">
+      - ✓ Organize receipts by category
+      - ✓ Scan all documents to PDF
+      - ✓ Calculate conversions to MXN
+      - ✓ Prepare observations with conversion details
+      - ✓ Verify totals against allowance
+    </Accordion>
+  </Step>
+  
+  <Step title="Verification Submission">
+    <Accordion title="Submit expenses">
+      - ✓ Upload PDF receipts (no XML)
+      - ✓ Enter converted MXN amounts
+      - ✓ Use pseudo-UUID for foreign invoices
+      - ✓ Document all conversions in observations
+      - ✓ Submit reimbursement if under allowance
+    </Accordion>
+  </Step>
+</Steps>
+
+## Common Issues and Solutions
+
+<AccordionGroup>
+  <Accordion title="No receipts from foreign vendors">
+    **Problem**: Restaurant/taxi didn't provide receipt
+    
+    **Solution**: 
+    - Use credit card statement as proof
+    - Note in observations: "No receipt available - credit card charge"
+    - Include transaction date and amount
+    - May count against 10% non-fiscal limit
+  </Accordion>
+  
+  <Accordion title="Receipt in foreign language">
+    **Problem**: Invoice in German/Chinese/etc.
+    
+    **Solution**:
+    - Upload original receipt
+    - Add typed translation in observations
+    - Note: "Translation: Hotel Müller - 3 nights @ €120/night = €360 total"
+    - Keep original for audit
+  </Accordion>
+  
+  <Accordion title="Credit card conversion different from official rate">
+    **Problem**: Card charged at MX $17.35 but official rate is $17.25
+    
+    **Solution**:
+    - Use **official rate** ($17.25) for verification
+    - Note difference in observations
+    - Small variances (< 2%) are acceptable
+    - Document: "Card rate $17.35, using official $17.25"
+  </Accordion>
+  
+  <Accordion title="Lodging exceeds daily allowance">
+    **Problem**: Hotel cost USD $300/night but allowance is $250/day total
+    
+    **Solution**:
+    - Submit actual expense
+    - Employer decides whether to cover excess
+    - May require special approval
+    - Document: "High-cost city exception requested"
+  </Accordion>
+  
+  <Accordion title="Missing exchange rate for obscure currency">
+    **Problem**: Expense in Malaysian Ringgit, no official MXN/MYR rate
+    
+    **Solution**:
+    - Convert to USD first using xe.com or similar
+    - Then USD to MXN using official rate
+    - Document full conversion path
+    - Example: "MYR 500 → USD $119.05 → MXN $2,053.61"
+  </Accordion>
+</AccordionGroup>
+
+## Audit Requirements
+
+International expenses face **stricter audit scrutiny**:
+
+### Required Documentation
+
+1. **Travel proof**:
+   - Boarding passes (all flights)
+   - Passport stamps
+   - Hotel confirmation
+
+2. **Expense proof**:
+   - Original receipts/invoices
+   - Credit card statements
+   - Currency conversion records
+
+3. **Calculation documentation**:
+   - Exchange rate source
+   - Conversion calculations
+   - Variance explanations
+
+### Retention Period
+
+<Warning>
+Keep **all original international receipts** for **5 years** minimum. Electronic copies alone may not satisfy auditors.
+</Warning>
+
+## Tips for Success
+
+<CardGroup cols={2}>
+  <Card title="Always Request Receipts" icon="receipt">
+    Even if vendor says "not needed," request formal documentation
+  </Card>
+  
+  <Card title="Photograph Everything" icon="camera">
+    Take phone photos of receipts immediately - thermal paper fades
+  </Card>
+  
+  <Card title="Use Credit Cards" icon="credit-card">
+    Provides automatic backup documentation via statements
+  </Card>
+  
+  <Card title="Track Exchange Rates" icon="chart-line">
+    Save screenshot of official rate on approval date
+  </Card>
+  
+  <Card title="Keep Boarding Passes" icon="plane">
+    Essential proof you actually traveled internationally
+  </Card>
+  
+  <Card title="Document Exceptions" icon="exclamation-triangle">
+    Over-budget expenses need written justification
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Expense Verification Guide" icon="clipboard-check" href="/comprobaciones/expense-verification">
+    Complete submission process for international expenses
+  </Card>
+  
+  <Card title="Comprobaciones Overview" icon="book-open" href="/comprobaciones/overview">
+    Review general expense verification concepts
+  </Card>
+</CardGroup>

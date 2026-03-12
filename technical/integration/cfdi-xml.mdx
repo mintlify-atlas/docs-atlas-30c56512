@@ -1,0 +1,376 @@
+---
+title: 'CFDI XML Processing'
+description: 'Learn how SMAF processes CFDI (Comprobante Fiscal Digital por Internet) XML invoices for versions 3.3 and 4.0'
+---
+
+## Overview
+
+SMAF implements comprehensive CFDI XML processing to handle electronic invoices issued by the Mexican tax authority (SAT). The system supports both CFDI version 3.3 and 4.0, automatically deserializing XML documents into strongly-typed C# objects for validation and storage.
+
+## CFDI XML Structure
+
+The CFDI XML follows the SAT schema with the following main elements:
+
+```xml
+<cfdi:Comprobante 
+  xmlns:cfdi="http://www.sat.gob.mx/cfd/3" 
+  Version="3.3"
+  Serie="A"
+  Folio="12345"
+  Fecha="2026-03-12T10:30:00"
+  FormaPago="03"
+  SubTotal="1000.00"
+  Total="1160.00"
+  TipoDeComprobante="I"
+  MetodoPago="PUE"
+  LugarExpedicion="03310">
+  
+  <cfdi:Emisor Rfc="AAA010101AAA" Nombre="Empresa SA" RegimenFiscal="601"/>
+  
+  <cfdi:Receptor Rfc="BBB020202BBB" Nombre="Cliente SA" UsoCFDI="G03"/>
+  
+  <cfdi:Conceptos>
+    <cfdi:Concepto 
+      ClaveProdServ="84111506"
+      Cantidad="1"
+      ClaveUnidad="E48"
+      Descripcion="Servicio de consultoría"
+      ValorUnitario="1000.00"
+      Importe="1000.00"/>
+  </cfdi:Conceptos>
+  
+  <cfdi:Impuestos TotalImpuestosTrasladados="160.00">
+    <cfdi:Traslados>
+      <cfdi:Traslado Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="160.00"/>
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+  
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital 
+      xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+      Version="1.1"
+      UUID="12345678-1234-1234-1234-123456789012"
+      FechaTimbrado="2026-03-12T10:31:00"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>
+```
+
+## XML Deserialization
+
+SMAF uses .NET XML serialization to convert CFDI XML into C# objects defined in `cfdv33.cs` and `cfdv4.cs`:
+
+```csharp
+public static void Lee_XMl(string psArchivo, List<Entidad> plEntidad, Entidades.Xml poXml)
+{
+    // Initialize XML serializer for CFDI Comprobante class
+    XmlSerializer serializer = new XmlSerializer(typeof(Comprobante));
+    
+    // Create XML reader from file path
+    XmlTextReader reader = new XmlTextReader(psArchivo);
+    
+    // Deserialize XML to Comprobante object
+    Comprobante factura = (Comprobante)serializer.Deserialize(reader);
+    
+    // Check CFDI version to handle differences
+    double dVersion = Convert.ToDouble(factura.Version);
+    
+    // Extract invoice data based on version
+    poXml.SERIE = factura.Serie;
+    poXml.FOLIO = factura.Folio;
+    poXml.VERSION = factura.Version;
+    
+    if (dVersion < 3.3)
+    {
+        // Handle CFDI 3.2 attributes (legacy format)
+        poXml.FORMA_PAGO = factura.formaDePago.ToString();
+        poXml.METODO_PAGO = factura.metodoDePago.ToString();
+        poXml.CUENTA_PAGO = factura.NumCtaPago;
+        poXml.TIPO_COMPROBANTE = factura.TipoDeComprobante.ToString();
+    }
+    else
+    {
+        // Handle CFDI 3.3+ attributes
+        poXml.FORMA_PAGO = factura.FormaPago.ToString();
+        
+        // Map payment method codes to descriptions
+        switch (factura.MetodoPago.ToString())
+        {
+            case "PUE":
+                poXml.METODO_PAGO = "Pago en una sola exhibición";
+                break;
+            case "PIP":
+                poXml.METODO_PAGO = "Pago inicial y parcialidades";
+                break;
+            case "PPD":
+                poXml.METODO_PAGO = "Pago en parcialidades o diferido";
+                break;
+        }
+        
+        // Map voucher type codes
+        switch (factura.TipoDeComprobante.ToString())
+        {
+            case "I":
+                poXml.TIPO_COMPROBANTE = "Ingreso";
+                break;
+            case "E":
+                poXml.TIPO_COMPROBANTE = "Egreso";
+                break;
+            case "T":
+                poXml.TIPO_COMPROBANTE = "Traslado";
+                break;
+            case "N":
+                poXml.TIPO_COMPROBANTE = "Nómina";
+                break;
+            case "P":
+                poXml.TIPO_COMPROBANTE = "Pago";
+                break;
+        }
+    }
+}
+```
+
+## Data Extraction Patterns
+
+### Issuer and Receiver Data
+
+```csharp
+// Extract issuer (emisor) information
+poXml.RFC_EMISOR = factura.Emisor.Rfc;
+poXml.NOMBRE_EMISOR = factura.Emisor.Nombre;
+poXml.CP_EMISOR = factura.LugarExpedicion;
+
+if (factura.Emisor.RegimenFiscal != null)
+{
+    poXml.REGIMENFISCAL_EMISOR = MngNegocioXml.Obtiene_RegimenFiscal(
+        factura.Emisor.RegimenFiscal.ToString());
+}
+
+// Extract receiver (receptor) information  
+poXml.RFC_RECEPTOR = factura.Receptor.Rfc;
+poXml.NOMBRE_RECEPTOR = factura.Receptor.Nombre;
+```
+
+### Invoice Amounts and Dates
+
+```csharp
+// Extract financial data
+poXml.AÑOEXP = factura.fecha.Year.ToString();
+poXml.FECHA_EXPEDICION = FormatFecha(factura.Fecha.ToString());
+poXml.SUBTOTAL = Convert_Decimales(factura.SubTotal.ToString());
+poXml.DESCUENTO = Convert_Decimales(factura.Descuento.ToString());
+poXml.TOTAL = Convert_Decimales(factura.Total.ToString());
+poXml.LUGAR_EXPEDICION = factura.LugarExpedicion.ToString();
+poXml.NO_CERTIFICADO = factura.NoCertificado;
+```
+
+### Concepts (Line Items)
+
+```csharp
+// Iterate through invoice line items
+foreach (ComprobanteConcepto con in factura.Conceptos)
+{
+    Entidad obj = new Entidad();
+    obj.Codigo = Convert_Decimales(con.Importe.ToString());
+    obj.Descripcion = con.Descripcion;
+    plEntidad.Add(obj);
+    obj = null;
+}
+```
+
+## Tax Calculations
+
+### Tax Transfers (Traslados)
+
+SMAF processes transferred taxes like IVA (VAT), ISR, and IEPS:
+
+```csharp
+if (factura.Impuestos != null)
+{
+    // Calculate total transferred and withheld taxes
+    poXml.TOTAL_IMPUESTOS_TRASLADADOS = 
+        Convert_Decimales(factura.Impuestos.TotalImpuestosTrasladados.ToString());
+    poXml.TOTAL_IMPUESTOS_RETENIDOS = 
+        Convert_Decimales(factura.Impuestos.TotalImpuestosRetenidos.ToString());
+    
+    // Process individual tax transfers
+    if (factura.Impuestos.Traslados != null)
+    {
+        foreach (ComprobanteImpuestosTraslado im in factura.Impuestos.Traslados)
+        {
+            switch (im.Impuesto.ToString())
+            {
+                case "IVA":
+                case "002":
+                    poXml.IVA = Convert_Decimales(im.Importe.ToString());
+                    break;
+                case "ISR":
+                case "001":
+                    poXml.ISR = Convert_Decimales(im.Importe.ToString());
+                    break;
+                case "IEPS":
+                case "003":
+                    poXml.IEPS = Convert_Decimales(im.Importe.ToString());
+                    break;
+            }
+        }
+    }
+}
+```
+
+### Tax Withholdings (Retenciones)
+
+```csharp
+if (factura.Impuestos.Retenciones != null)
+{
+    foreach (ComprobanteImpuestosRetencion ir in factura.Impuestos.Retenciones)
+    {
+        switch (ir.Impuesto.ToString())
+        {
+            case "IVA":
+            case "002":
+                poXml.IVA_RETENIDO = Convert_Decimales(ir.Importe.ToString());
+                break;
+            case "ISR":
+            case "001":
+                poXml.ISR_RETENIDO = Convert_Decimales(ir.Importe.ToString());
+                break;
+            case "IEPS":
+            case "003":
+                poXml.IEPS_RETENIDO = Convert_Decimales(ir.Importe.ToString());
+                break;
+        }
+    }
+}
+```
+
+## Timbre Fiscal Digital (Digital Tax Stamp)
+
+The Timbre Fiscal Digital is extracted from the Complemento section and contains the UUID and timestamp:
+
+```csharp
+// Extract Timbre Fiscal Digital from complement
+foreach (ComprobanteComplemento r in factura.Complemento)
+{
+    for (int y = 0; y < r.Any.Length; y++)
+    {
+        int x = r.Any[y].Attributes.Count;
+        
+        for (int contador = 0; contador < x; contador++)
+        {
+            if (r.Any[y].Attributes[contador].Name == "UUID")
+            {
+                // Extract UUID (fiscal folio)
+                poXml.TIMBRE_FISCAL = r.Any[y].Attributes["UUID"].Value;
+                
+                // Extract timestamp
+                poXml.FECHA_TIMBRADO = FormatFecha(
+                    r.Any[y].Attributes["FechaTimbrado"].Value);
+            }
+        }
+    }
+}
+```
+
+## Version-Specific Classes
+
+### CFDI 3.3 Schema Mapping
+
+The `cfdv33.cs` file defines the complete object model:
+
+```csharp
+[XmlTypeAttribute(AnonymousType=true, Namespace="http://www.sat.gob.mx/cfd/3")]
+[XmlRootAttribute(Namespace="http://www.sat.gob.mx/cfd/3", IsNullable=false)]
+public partial class Comprobante {
+    private ComprobanteEmisor emisorField;
+    private ComprobanteReceptor receptorField;
+    private ComprobanteConcepto[] conceptosField;
+    private ComprobanteImpuestos impuestosField;
+    private ComprobanteComplemento[] complementoField;
+    
+    [XmlAttributeAttribute()]
+    public string Version { get; set; }
+    
+    [XmlAttributeAttribute()]
+    public decimal SubTotal { get; set; }
+    
+    [XmlAttributeAttribute()]
+    public decimal Total { get; set; }
+    
+    // ... additional properties
+}
+```
+
+### CFDI 4.0 Schema Mapping
+
+The `cfdv4.cs` file follows a similar structure with version 4.0 namespace:
+
+```csharp
+[XmlTypeAttribute(AnonymousType = true, Namespace = "http://www.sat.gob.mx/cfd/4")]
+[XmlRootAttribute(Namespace = "http://www.sat.gob.mx/cfd/4", IsNullable = false)]
+public partial class Comprobante {
+    // Similar structure adapted for CFDI 4.0 specifications
+}
+```
+
+## Data Storage
+
+Extracted XML data is stored in the `Xml` entity class:
+
+```csharp
+public class Xml
+{
+    // Invoice header
+    private string serie;
+    private string folio;
+    private string versionXml;
+    private string formaPago;
+    private string MetodoPago;
+    private string FechaExp;
+    private string subtotal;
+    private string total;
+    
+    // Issuer data
+    private string rfc;
+    private string NombreEMisor;
+    private string regimen;
+    
+    // Receiver data
+    private string rfcR;
+    private string nombreR;
+    
+    // Tax data
+    private string totalImpuestosTrasladados;
+    private string total_Impuestos_retenidos;
+    private string iva;
+    private string isr;
+    private string ieps;
+    private string iva_ret;
+    private string isr_ret;
+    
+    // Timbre Fiscal Digital
+    private string TimbreFiscalDigital;
+    private string fechaTimbrado;
+}
+```
+
+<Note>
+The XML deserialization automatically handles both CFDI 3.3 and 4.0 formats, with version detection logic to apply the appropriate parsing rules.
+</Note>
+
+<Warning>
+All monetary values are formatted to two decimal places using the `Convert_Decimales()` helper function to ensure consistency across the system.
+</Warning>
+
+## Best Practices
+
+1. **Version Detection**: Always check the CFDI version before extracting version-specific attributes
+2. **Null Validation**: Validate that optional elements (like Impuestos, Retenciones) exist before accessing them
+3. **Tax Code Mapping**: Support both legacy text codes ("IVA") and new numeric codes ("002")
+4. **UUID Extraction**: The UUID is always located in the Complemento/TimbreFiscalDigital element
+5. **Date Formatting**: Convert all dates to the standard format (YYYY-MM-DD) for database storage
+
+## Related Documentation
+
+- [SAT Validation](/technical/integration/sat-validation) - UUID validation and duplicate detection
+- [Database Schema](/technical/database/schema) - Storage of extracted CFDI data
+- [API Reference](/api-reference/invoices) - Endpoints for CFDI processing

@@ -1,122 +1,178 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "SMAF",
+  "theme": "linden",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#1e4d8b",
+    "light": "#3b7dd6",
+    "dark": "#0f2a4d"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/JLLMEXTI/SMAF"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/JLLMEXTI/SMAF"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "overview",
+              "architecture"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "user-guide/authentication",
+              "user-guide/dashboard",
+              "user-guide/navigation"
+            ]
+          },
+          {
+            "group": "Solicitudes",
+            "pages": [
+              "solicitudes/overview",
+              "solicitudes/comision-requests",
+              "solicitudes/psp-requests"
+            ]
+          },
+          {
+            "group": "Comprobaciones",
+            "pages": [
+              "comprobaciones/overview",
+              "comprobaciones/expense-verification",
+              "comprobaciones/xml-invoices",
+              "comprobaciones/international-travel"
+            ]
+          },
+          {
+            "group": "Autorizaciones",
+            "pages": [
+              "autorizaciones/overview",
+              "autorizaciones/approval-workflow"
+            ]
+          },
+          {
+            "group": "Pagos y Ministraciones",
+            "pages": [
+              "pagos/overview",
+              "pagos/payment-processing",
+              "ministraciones/overview",
+              "ministraciones/fund-allocation"
+            ]
+          },
+          {
+            "group": "Reportes",
+            "pages": [
+              "reportes/overview",
+              "reportes/expense-reports",
+              "reportes/transparency-reports",
+              "reportes/financial-reports"
+            ]
+          },
+          {
+            "group": "Catalogos",
+            "pages": [
+              "catalogos/overview",
+              "catalogos/projects",
+              "catalogos/programs",
+              "catalogos/budget-items"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Technical Reference",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "technical/architecture-overview",
+              "technical/three-tier-architecture",
+              "technical/database-schema"
+            ]
+          },
+          {
+            "group": "Business Logic Layer",
+            "pages": [
+              "technical/brl/overview",
+              "technical/brl/commission-management",
+              "technical/brl/verification-management",
+              "technical/brl/payment-management"
+            ]
+          },
+          {
+            "group": "Data Access Layer",
+            "pages": [
+              "technical/dal/overview",
+              "technical/dal/database-connection",
+              "technical/dal/data-operations"
+            ]
+          },
+          {
+            "group": "Entities",
+            "pages": [
+              "technical/entities/overview",
+              "technical/entities/comision",
+              "technical/entities/comprobacion",
+              "technical/entities/usuario"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "technical/integration/cfdi-xml",
+              "technical/integration/sat-validation",
+              "technical/integration/email-notifications"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Administration",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "admin/installation",
+              "admin/configuration",
+              "admin/database-setup"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "admin/user-management",
+              "admin/permissions",
+              "admin/encryption"
+            ]
+          },
+          {
+            "group": "Maintenance",
+            "pages": [
+              "admin/backup-restore",
+              "admin/monitoring",
+              "admin/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

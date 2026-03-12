@@ -1,0 +1,428 @@
+---
+title: User Management
+description: Manage user accounts, roles, profiles, and access control in SMAF
+---
+
+## Overview
+
+SMAF implements comprehensive user management functionality to control access to the expense and travel allowance system. User accounts are managed through a hierarchical structure that includes roles, departments, and organizational units.
+
+## User Entity Structure
+
+The system uses the `Usuario` entity to represent user accounts with the following key properties:
+
+```csharp
+public class Usuario
+{
+    private string lsUsuario;      // Username
+    private string lsPassword;     // Password (encrypted)
+    private string lsNivel;        // Level
+    private string lsPlaza;        // Plaza/Position code
+    private string lsPuesto;       // Job title
+    private string lsSecretaria;   // Secretariat
+    private string lsOrganismo;    // Organization
+    private string lsUbicacion;    // Department/Location
+    private string lsArea;         // Area
+    private string lsNombre;       // First name
+    private string lsApPat;        // Paternal surname
+    private string lsApMat;        // Maternal surname
+    private string lsRFC;          // Tax ID (RFC)
+    private string lsCargo;        // Position
+    private string lsEmail;        // Email
+    private string lsRol;          // Role
+    private string lsAbreviatura;  // Title abbreviation
+    private string lsCURP;         // National ID (CURP)
+    private string lsNumEmp;       // Employee number
+}
+```
+
+## Creating and Managing Users
+
+### User Retrieval by Department
+
+Retrieve all active users in a specific department:
+
+```csharp
+List<Entidad> ListaUsuariosDependencia(string psDep)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS CODIGO, " +
+                     "CONCAT(NOMBRE,' ',APELLIDO_PAT,' ',APELLIDO_MAT) AS DESCRIPCION " +
+                     "FROM vw_usuarios WHERE DEPENDENCIA= '" + psDep + "'";
+    
+    // Execute query and return user list
+}
+```
+
+### User Profile Retrieval
+
+Get complete user data including organizational information:
+
+```csharp
+Usuario Obten_Datos(string psUsuario, bool psBandera = false)
+{
+    string lsQuery = "SELECT DISTINCT USSER, " +
+                     "CONCAT(NOMBRE,' ',APELLIDO_PAT,' ',APELLIDO_MAT) AS NOMBRE, " +
+                     "EMAIL, SECRETARIA, ORGANISMO, DEPENDENCIA, ROL, CARGO " +
+                     "FROM vw_usuarios WHERE USSER = '" + psUsuario + "'";
+    
+    // Populate Usuario object with query results
+}
+```
+
+## User Roles and Hierarchies
+
+### Standard User Roles
+
+The system defines the following user roles (see `clsDictionary.cs`):
+
+<ParamField path="INVEST" type="string">
+  **Researcher (Investigador)** - Research personnel who create expense requests
+</ParamField>
+
+<ParamField path="ENLACE" type="string">
+  **Liaison (Enlace)** - Coordination staff who facilitate request processing
+</ParamField>
+
+<ParamField path="ADMCRIPSC" type="string">
+  **Administrator** - Center administrators with approval authority
+</ParamField>
+
+<ParamField path="JFCCRIPSC" type="string">
+  **Center Chief (Jefe de Centro)** - Research center directors
+</ParamField>
+
+<ParamField path="DIRADJUNT" type="string">
+  **Adjunct Director** - Deputy directors with regional authority
+</ParamField>
+
+<ParamField path="SUBDIRAD" type="string">
+  **Sub-Director Adjunct** - Sub-director level
+</ParamField>
+
+<ParamField path="DIRGRAINA" type="string">
+  **General Director** - Top-level executive authority
+</ParamField>
+
+<ParamField path="ADMINP" type="string">
+  **INAPESCA Administrator** - System-wide administrative access
+</ParamField>
+
+<ParamField path="JFDEPTO" type="string">
+  **Department Chief** - Department-level management
+</ParamField>
+
+<ParamField path="DIRADMIN" type="string">
+  **Administrative Director** - Financial and administrative oversight
+</ParamField>
+
+### Role Retrieval
+
+Get the role assigned to a specific user:
+
+```csharp
+string Obtiene_Rol_Usuario(string psUsuario)
+{
+    string Query = "SELECT DISTINCT(ROL) AS ROL FROM vw_usuarios " +
+                   "WHERE USSER = '" + psUsuario + "'";
+    
+    // Returns role code (e.g., "INVEST", "JFCCRIPSC", etc.)
+}
+```
+
+## User Authentication Flow
+
+### Login Process
+
+The system implements a secure authentication flow:
+
+<Steps>
+  <Step title="User provides credentials">
+    User enters username, password, and department location through the login form.
+  </Step>
+
+  <Step title="Credential decryption">
+    The username is decrypted using Rijndael/AES encryption:
+    
+    ```csharp
+    string decryptedUser = MngEncriptacion.decripString(psUsuario);
+    ```
+  </Step>
+
+  <Step title="Database authentication">
+    Query the `vw_usuarios` view to validate credentials:
+    
+    ```csharp
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, " +
+                     "PASSWORD AS PASSWORD, NIVEL, PLAZA, PUESTO, " +
+                     "SECRETARIA, ORGANISMO, DEPENDENCIA, AREA, " +
+                     "NOMBRE, APELLIDO_PAT, APELLIDO_MAT, RFC, " +
+                     "CARGO, EMAIL, ROL, ABREVIATURA " +
+                     "FROM vw_usuarios " +
+                     "WHERE USSER = '" + MngEncriptacion.decripString(psUsuario) + "' " +
+                     "AND PASSWORD = '" + psPassword + "' " +
+                     "AND PERIODO = '" + year + "'";
+    ```
+  </Step>
+
+  <Step title="User object creation">
+    Create a `Usuario` object with all user properties and store in session.
+  </Step>
+
+  <Step title="Access granted">
+    User is redirected to the appropriate dashboard based on their role.
+  </Step>
+</Steps>
+
+<Note>
+Passwords are validated in plain text during authentication, but the username is transmitted encrypted to protect user identity during transit.
+</Note>
+
+## User Session Management
+
+### Session Data Storage
+
+Upon successful authentication, the system stores the following in the user session:
+
+- **User ID** (USSER)
+- **Full name** (Nombre + ApPat + ApMat)
+- **Role** (ROL)
+- **Department** (Ubicacion)
+- **Position** (Cargo)
+- **Email**
+- **Organizational hierarchy** (Secretaria, Organismo)
+
+### Active User Validation
+
+The system validates that users are active for the current period:
+
+```csharp
+lsQuery += "AND PERIODO = '" + year + "'";
+lsQuery += "AND ESTATUS = '1'";
+```
+
+<Warning>
+Users must be active for the current fiscal year to access the system. Inactive users or those from previous periods cannot authenticate.
+</Warning>
+
+## User Queries and Filtering
+
+### Get Users by Department and Role
+
+Filter users based on department and role criteria:
+
+```csharp
+List<Entidad> MngDatosPersonal(string psDep, string psUsuarioLogeado, 
+                               string lsRol, bool pbBandera = false)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, " +
+                     "NOMBRE, APELLIDO_PAT AS APELLIDO_PATERNO, " +
+                     "APELLIDO_MAT AS APELLIDO_MATERNO " +
+                     "FROM vw_usuarios " +
+                     "WHERE DEPENDENCIA = '" + psDep + "'";
+    
+    // Optional: Exclude current user
+    if (!pbBandera) {
+        lsQuery += " AND USSER != '" + psUsuarioLogeado + "'";
+    }
+}
+```
+
+### Get External Users
+
+Retrieve users from other secretariats or organizations:
+
+```csharp
+List<Entidad> MngDatosPersonalExterno(string psSec, string psOrg, 
+                                      string psCentro, string psRol = "")
+{
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, " +
+                     "NOMBRE, APELLIDO_PAT, APELLIDO_MAT " +
+                     "FROM vw_usuarios " +
+                     "WHERE DEPENDENCIA = '" + psCentro + "' " +
+                     "AND ORGANISMO = '" + psOrg + "' " +
+                     "AND SECRETARIA = '" + psSec + "'";
+    
+    if (psRol == "INVEST") {
+        lsQuery += "AND ROL = 'INVEST'";
+    }
+}
+```
+
+## User Information Retrieval
+
+### Get User's Position
+
+```csharp
+string Obtiene_Cargo(string psUsuario, string psDireccion = "")
+{
+    string lsQuery = "SELECT DISTINCT CARGO AS CARGO " +
+                     "FROM vw_usuarios " +
+                     "WHERE USSER = '" + psUsuario + "'";
+    
+    if (psDireccion != "") {
+        lsQuery += "AND DEPENDENCIA = '" + psDireccion + "'";
+    }
+}
+```
+
+### Get User's Full Name
+
+```csharp
+string Obtiene_Nombre_Completo(string psUsuario)
+{
+    string lsQuery = "SELECT DISTINCT (CONCAT(ABREVIATURA,' ',NOMBRE,' '," +
+                     "AP_PAT,' ',AP_MAT)) AS NOMBRE " +
+                     "FROM crip_usuarios " +
+                     "WHERE USUARIO = '" + psUsuario + "'";
+}
+```
+
+### Get User's Department
+
+```csharp
+string Obtiene_Ubi_Usuario(string psUsuario)
+{
+    string Query = "SELECT DISTINCT(DEPENDENCIA) AS UBICACION " +
+                   "FROM vw_usuarios " +
+                   "WHERE USSER = '" + psUsuario + "'";
+}
+```
+
+## User Assignment to Projects
+
+### Get Users Assigned to Project
+
+Retrieve all users working on a specific project:
+
+```csharp
+List<Entidad> UsuarioProyecto(string pPeriodo, string pClave, 
+                              string pDepProy, string pEstatus)
+{
+    string Query = "SELECT USUARIO FROM crip_job " +
+                   "WHERE PERIODO = '" + pPeriodo + "' " +
+                   "AND CLV_PROY = '" + pClave + "' " +
+                   "AND CLV_DEP_PROY = '" + pDepProy + "' " +
+                   "AND ESTATUS = '" + pEstatus + "'";
+}
+```
+
+## Administrative User Queries
+
+### Get Administrator by Role and Department
+
+```csharp
+Usuario Datos_Administrador(string psRol, string psComisionado, bool dep = false)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, NIVEL, PLAZA, " +
+                     "PUESTO, SECRETARIA, ORGANISMO, DEPENDENCIA AS UBICACION, " +
+                     "AREA, NOMBRE, APELLIDO_PAT, APELLIDO_MAT, RFC, CARGO, " +
+                     "EMAIL, ROL, ABREVIATURA " +
+                     "FROM vw_usuarios " +
+                     "WHERE ROL = '" + psRol + "'";
+    
+    if (!dep) {
+        lsQuery += "AND USSER = '" + psComisionado + "'";
+    } else {
+        lsQuery += "AND DEPENDENCIA = '" + psComisionado + "'";
+    }
+}
+```
+
+### Get Adjunct Director
+
+Retrieve the adjunct director for a specific location:
+
+```csharp
+Entidad Datos_DirAdjunto(string psUbicacion)
+{
+    string lsQuery = "SELECT USSER AS USUARIO, " +
+                     "CONCAT(NOMBRE,' ',APELLIDO_PAT,' ',APELLIDO_MAT) AS NOMBRE " +
+                     "FROM vw_usuarios " +
+                     "WHERE DEPENDENCIA = '" + psUbicacion + "' " +
+                     "AND PUESTO LIKE '%ADJUNTO%' " +
+                     "AND (ROL = 'DIRADMIN' OR ROL = 'DIRADJUNT')";
+}
+```
+
+## User Activation and Deactivation
+
+<Note>
+User activation/deactivation is controlled through the `ESTATUS` field in the database:
+- `'1'` = Active user
+- `'0'` = Inactive user
+
+All user queries automatically filter for active users (`ESTATUS = '1'`).
+</Note>
+
+## Audit Trail
+
+The system maintains user activity through period-based tracking:
+
+- **Period field** (`PERIODO`): Tracks the fiscal year for user assignments
+- **Status field** (`ESTATUS`): Records active/inactive state
+- **Job assignments** (`crip_job` table): Maintains historical records of user roles and positions
+
+### Period-Based User Data
+
+```csharp
+Usuario DatosComisionado1(string psComisionado, string psPeriodo)
+{
+    string lsQuery = "SELECT DISTINCT USSER AS USUARIO, NIVEL, PLAZA, " +
+                     "PUESTO, SECRETARIA, ORGANISMO, DEPENDENCIA, AREA, " +
+                     "NOMBRE, APELLIDO_PAT, APELLIDO_MAT, RFC, CURP, " +
+                     "N_EMPLEADO, CARGO, EMAIL, ROL, ABREVIATURA " +
+                     "FROM vw_usuarios_gral " +
+                     "WHERE USSER = '" + psComisionado + "' " +
+                     "AND PERIODO = '" + psPeriodo + "'";
+}
+```
+
+## Password Policies
+
+<Warning>
+The current implementation stores passwords in plain text in the database. While usernames are encrypted during transmission, passwords should be hashed using a secure algorithm (e.g., bcrypt, PBKDF2, or Argon2) in a production environment.
+</Warning>
+
+### Password Storage
+
+Current implementation:
+- Passwords are stored as plain text strings
+- Validated by direct comparison during authentication
+- No password complexity requirements enforced at the code level
+
+### Recommended Improvements
+
+1. Implement password hashing with salt
+2. Enforce password complexity requirements (length, special characters, etc.)
+3. Implement password expiration policies
+4. Add password history to prevent reuse
+5. Implement account lockout after failed login attempts
+
+## Database Views
+
+The system uses the following database views for user management:
+
+- **`vw_usuarios`**: Main view for active users in current period
+- **`vw_usuarios_gral`**: General view including historical user data
+- **`crip_usuarios`**: Base user table
+- **`crip_job`**: User job assignments and roles by period
+
+## Best Practices
+
+<Steps>
+  <Step title="Always filter by period">
+    Ensure queries include the current fiscal year to prevent access by users from previous periods.
+  </Step>
+
+  <Step title="Validate department access">
+    Check that users have appropriate access to the department they're requesting data from.
+  </Step>
+
+  <Step title="Use role-based filtering">
+    Filter user lists based on the requesting user's role to implement proper hierarchical access.
+  </Step>
+
+  <Step title="Sanitize input">
+    While not shown in the source code, always sanitize user input to prevent SQL injection attacks.
+  </Step>
+</Steps>

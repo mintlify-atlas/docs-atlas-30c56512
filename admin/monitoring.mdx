@@ -1,0 +1,666 @@
+---
+title: System Monitoring
+description: Performance monitoring, error tracking, and system health metrics for SMAF
+---
+
+## Overview
+
+SMAF provides comprehensive monitoring capabilities through the Monitoreo module, database connection monitoring, file upload tracking, error logging, and user activity monitoring. This guide covers all monitoring aspects of the system.
+
+## Monitoreo Dashboard
+
+### Accessing Monitoreo
+
+The monitoring dashboard is accessible at:
+
+```text
+https://your-server/Monitoreo/Monitoreo.aspx
+```
+
+<Note>
+Access to the Monitoreo module requires administrator privileges. Only users with role permissions can view system monitoring data.
+</Note>
+
+### Dashboard Components
+
+The Monitoreo.aspx page provides real-time visibility into:
+
+- Active user sessions
+- Database connection status
+- File upload statistics
+- System error logs
+- Performance metrics
+- Recent user activity
+
+## Database Connection Monitoring
+
+### Connection Pool Status
+
+SMAF uses MySQL connection pooling managed through `MngConexion.cs`. Monitor connection health:
+
+```csharp
+// Connection management locations
+public static MySqlConnection getConexionMysql()      // Main SMAF database
+public static MySqlConnection getConexionMysql_dgaipp()  // DGAIPP database
+public static MySqlConnection getConexionMysql_Contratos()  // Contracts database
+public static MySqlConnection getConexionMysql_ModuloConsulta()  // Query module
+```
+
+### Monitor Active Connections
+
+```sql
+-- Check active MySQL connections
+SHOW PROCESSLIST;
+
+-- Count connections by database
+SELECT db, COUNT(*) as connections 
+FROM information_schema.processlist 
+GROUP BY db;
+
+-- Identify long-running queries
+SELECT id, user, host, db, command, time, state, info
+FROM information_schema.processlist
+WHERE time > 30
+ORDER BY time DESC;
+```
+
+### Connection String Validation
+
+Connection strings are encrypted in `web.config`. Monitor decryption health:
+
+```xml
+<!-- Encrypted connection strings in web.config -->
+<add key="localhost" value="tGf1BXWYdXKSsk+PoraCYtfZx2CaCz+YSH7fEzln+tPCCIPyhXka5KxFVkYaJDYXUGY8BwEgL2KIww23CpBtBw==" />
+<add key="localhost_dgaipp" value="tGf1BXWYdXKSsk+PoraCYvUxO9Yfr80kpFMxpZN60zKA15b9S5UHaufvII8GtSL31z1MDYDQY1WfatINvt6oeA==" />
+```
+
+<Warning>
+If connection string decryption fails, the application will be unable to connect to the database. Monitor `MngEncriptacion.decripString()` exceptions.
+</Warning>
+
+## Session Monitoring
+
+### Active User Sessions
+
+SMAF stores user session data with a 20-minute timeout:
+
+```csharp
+Session.Timeout = 20;  // 20 minutes
+```
+
+### Session Variables Tracked
+
+<Accordion title="Session Variables">
+
+**User Authentication:**
+- `Session["Crip_Usuario"]` - Username
+- `Session["Crip_Password"]` - Encrypted password
+- `Session["Crip_Nivel"]` - User level
+- `Session["Crip_Rol"]` - User role
+
+**User Information:**
+- `Session["Crip_Nombre"]` - First name
+- `Session["Crip_ApPat"]` - Paternal surname
+- `Session["Crip_ApMat"]` - Maternal surname
+- `Session["Crip_RFC"]` - Tax ID
+- `Session["Crip_Email"]` - Email address
+
+**Administrative Context:**
+- `Session["Crip_Ubicacion"]` - Administrative unit
+- `Session["Crip_Secretaria"]` - Secretary
+- `Session["Crip_Organismo"]` - Organism
+- `Session["Crip_Area"]` - Area
+- `Session["Crip_Plaza"]` - Position
+- `Session["Crip_Cargo"]` - Job title
+
+**Application Data:**
+- `Session["CargaDatos"]` - Cached data
+- `Session["Crip_Folio"]` - Current folio
+- `Session["Version"]` - Application version
+
+</Accordion>
+
+### Monitor Session Activity
+
+Track concurrent users and session health:
+
+```sql
+-- Query active user sessions (if logged to database)
+SELECT COUNT(DISTINCT USUARIO) as active_users
+FROM crip_usuarios
+WHERE LAST_LOGIN >= DATE_SUB(NOW(), INTERVAL 20 MINUTE);
+```
+
+## File Upload Monitoring
+
+### XML File Upload Tracking
+
+Monitor XML invoice uploads through `crip_xml_detalle` table:
+
+```sql
+-- Monitor recent XML uploads
+SELECT 
+    USUARIO,
+    UBICACION_USUARIO,
+    COUNT(*) as xml_count,
+    SUM(TOTAL) as total_amount,
+    MAX(FECH_EFF) as last_upload
+FROM crip_xml_detalle
+WHERE FECH_EFF >= CURDATE()
+GROUP BY USUARIO, UBICACION_USUARIO
+ORDER BY last_upload DESC;
+
+-- Check for failed XML processing
+SELECT 
+    DOCUMENTO,
+    USUARIO,
+    UUID,
+    ESTATUS,
+    FECH_EFF
+FROM crip_xml_detalle
+WHERE ESTATUS = '0'
+ORDER BY FECH_EFF DESC
+LIMIT 20;
+```
+
+### PDF Document Upload Tracking
+
+Monitor PDF uploads and storage:
+
+```bash
+# Monitor PDF directory growth
+du -sh /var/www/InapescaWeb/PDF/*/
+
+# Count PDFs uploaded today
+find /var/www/InapescaWeb/PDF/ -name "*.pdf" -mtime -1 | wc -l
+
+# Check for large files (> 10MB)
+find /var/www/InapescaWeb/PDF/ -name "*.pdf" -size +10M -ls
+
+# Monitor disk space
+df -h /var/www/InapescaWeb/
+```
+
+### File Upload Size Limits
+
+Configured in `web.config`:
+
+```xml
+<httpRuntime maxRequestLength="50000" />
+```
+
+<Note>
+`maxRequestLength` is in kilobytes. Current limit: 50MB (50,000 KB)
+</Note>
+
+## Error Logging and Tracking
+
+### Exception Handling Patterns
+
+SMAF implements try-catch blocks in critical DAL methods:
+
+<CodeGroup>
+
+```csharp Login Errors
+// MngDatosLogin.cs - Authentication failures
+catch (Exception ex)
+{
+    return new Usuario {Usser = "0" };
+}
+
+// Error messages:
+// "No se encuentra el usuario , validar datos"
+// "La contraseña es incorrecta"
+// "El usuario Ingresado no pertenece a la unidad administrativa especificada"
+```
+
+```csharp FTP Errors  
+// MngFtp.cs - File transfer errors
+catch (WebException ex)
+{
+    // FTP connection failures
+}
+
+catch (Exception ex)
+{
+    // General FTP errors
+}
+```
+
+```csharp Encryption Errors
+// MngEncriptacion.cs - Decryption failures
+catch (Exception ex)
+{
+    // Connection string decryption errors
+}
+```
+
+```csharp Data Access Errors
+// MngDatosExcel.cs, MngDatosPef.cs - Database errors
+catch (Exception e)
+{
+    // SQL execution errors
+}
+```
+
+</CodeGroup>
+
+### Custom Error Pages
+
+Configured in `web.config`:
+
+```xml
+<customErrors mode="RemoteOnly" defaultRedirect="../index.aspx" />
+```
+
+- **RemoteOnly**: Shows detailed errors locally, generic page remotely
+- **defaultRedirect**: Redirects to index.aspx on unhandled errors
+
+### Monitor Application Errors
+
+```sql
+-- Query error logs (if logged to database)
+SELECT 
+    error_type,
+    error_message,
+    user_id,
+    page_url,
+    COUNT(*) as occurrence_count,
+    MAX(error_date) as last_occurrence
+FROM application_errors
+WHERE error_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY error_type, error_message
+ORDER BY occurrence_count DESC;
+```
+
+## Performance Monitoring
+
+### Database Performance Metrics
+
+<Steps>
+
+<Step title="Monitor query performance">
+```sql
+-- Enable slow query log
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 2;
+
+-- Check slow query log location
+SHOW VARIABLES LIKE 'slow_query_log_file';
+```
+</Step>
+
+<Step title="Analyze slow queries">
+```bash
+# Analyze slow query log
+mysqldumpslow -s t -t 10 /var/log/mysql/slow-query.log
+```
+</Step>
+
+<Step title="Monitor key metrics">
+```sql
+-- Database size
+SELECT 
+    table_schema AS 'Database',
+    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
+FROM information_schema.tables
+WHERE table_schema = 'inapesca_cripsc'
+GROUP BY table_schema;
+
+-- Table sizes
+SELECT 
+    table_name AS 'Table',
+    ROUND(((data_length + index_length) / 1024 / 1024), 2) AS 'Size (MB)',
+    table_rows AS 'Rows'
+FROM information_schema.tables
+WHERE table_schema = 'inapesca_cripsc'
+ORDER BY (data_length + index_length) DESC
+LIMIT 10;
+```
+</Step>
+
+</Steps>
+
+### Key Performance Indicators (KPIs)
+
+<CardGroup cols={2}>
+  <Card title="Commission Processing" icon="file-signature">
+    Monitor average time to process commission requests from submission to approval
+  </Card>
+  <Card title="Payment References" icon="money-bill">
+    Track payment reference generation time and success rate
+  </Card>
+  <Card title="XML Validation" icon="file-code">
+    Monitor XML invoice validation time and failure rate
+  </Card>
+  <Card title="Database Queries" icon="database">
+    Track average query execution time and identify slow queries
+  </Card>
+</CardGroup>
+
+### Application Performance Queries
+
+```sql
+-- Monitor commission processing volume
+SELECT 
+    DATE(FECHA_SOL) as fecha,
+    COUNT(*) as comisiones_creadas,
+    SUM(CASE WHEN ESTATUS = '1' THEN 1 ELSE 0 END) as activas,
+    SUM(CASE WHEN ESTATUS = '2' THEN 1 ELSE 0 END) as completadas
+FROM crip_comision
+WHERE FECHA_SOL >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY DATE(FECHA_SOL)
+ORDER BY fecha DESC;
+
+-- Payment reference generation tracking
+SELECT 
+    DATE(FECHA_GENERA) as fecha,
+    COUNT(*) as referencias_generadas,
+    SUM(IMPORTE) as monto_total,
+    AVG(IMPORTE) as monto_promedio
+FROM crip_referencia
+WHERE FECHA_GENERA >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY DATE(FECHA_GENERA)
+ORDER BY fecha DESC;
+
+-- XML upload statistics
+SELECT 
+    DATE(FECH_EFF) as fecha,
+    COUNT(*) as xml_uploads,
+    COUNT(DISTINCT USUARIO) as usuarios_unicos,
+    SUM(TOTAL) as importe_total
+FROM crip_xml_detalle
+WHERE FECH_EFF >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+GROUP BY DATE(FECH_EFF)
+ORDER BY fecha DESC;
+```
+
+## User Activity Monitoring
+
+### Login Activity Tracking
+
+```sql
+-- Monitor user login patterns
+SELECT 
+    USUARIO,
+    NOMBRE,
+    APELLIDO_PAT,
+    UBICACION,
+    ROL,
+    LAST_LOGIN,
+    LOGIN_COUNT
+FROM vw_usuarios
+WHERE ESTATUS = '1'
+  AND PERIODO = YEAR(CURDATE())
+ORDER BY LAST_LOGIN DESC
+LIMIT 50;
+
+-- Identify inactive users
+SELECT 
+    USSER as usuario,
+    NOMBRE,
+    APELLIDO_PAT,
+    LAST_LOGIN,
+    DATEDIFF(CURDATE(), LAST_LOGIN) as dias_inactivo
+FROM crip_usuarios
+WHERE ESTATUS = '1'
+  AND LAST_LOGIN < DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+ORDER BY dias_inactivo DESC;
+```
+
+### User Actions Audit
+
+Monitor critical user actions:
+
+```sql
+-- Commission creation by user
+SELECT 
+    USSER as usuario,
+    COUNT(*) as comisiones_creadas,
+    MIN(FECHA_SOL) as primera_comision,
+    MAX(FECHA_SOL) as ultima_comision
+FROM crip_comision
+WHERE FECHA_SOL >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY USSER
+ORDER BY comisiones_creadas DESC;
+
+-- Payment processing by user
+SELECT 
+    USUARIO_GENERA,
+    COUNT(*) as pagos_procesados,
+    SUM(IMPORTE) as monto_total
+FROM crip_referencia
+WHERE FECHA_GENERA >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY USUARIO_GENERA
+ORDER BY pagos_procesados DESC;
+```
+
+## System Health Checks
+
+### Automated Health Check Script
+
+```bash
+#!/bin/bash
+# SMAF Health Check Script
+
+LOG_FILE="/var/log/smaf-health.log"
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+echo "[$DATE] Starting SMAF health check" >> $LOG_FILE
+
+# Check MySQL service
+if systemctl is-active --quiet mysql; then
+    echo "[$DATE] MySQL: OK" >> $LOG_FILE
+else
+    echo "[$DATE] MySQL: FAILED" >> $LOG_FILE
+    echo "MySQL service is down on $(hostname)" | mail -s "SMAF Alert" admin@inapesca.gob.mx
+fi
+
+# Check database connectivity
+mysql -u monitor -p$MONITOR_PASS -e "SELECT 1" inapesca_cripsc > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "[$DATE] Database connectivity: OK" >> $LOG_FILE
+else
+    echo "[$DATE] Database connectivity: FAILED" >> $LOG_FILE
+    echo "Cannot connect to SMAF database" | mail -s "SMAF Alert" admin@inapesca.gob.mx
+fi
+
+# Check IIS application pool
+appcmd list apppool "SMAFAppPool" | grep -q "Started"
+if [ $? -eq 0 ]; then
+    echo "[$DATE] IIS AppPool: OK" >> $LOG_FILE
+else
+    echo "[$DATE] IIS AppPool: FAILED" >> $LOG_FILE
+    echo "SMAF application pool is not running" | mail -s "SMAF Alert" admin@inapesca.gob.mx
+fi
+
+# Check disk space
+USAGE=$(df -h /var/www/InapescaWeb | awk 'NR==2 {print $5}' | sed 's/%//')
+if [ $USAGE -gt 85 ]; then
+    echo "[$DATE] Disk space: WARNING (${USAGE}%)" >> $LOG_FILE
+    echo "Disk usage is at ${USAGE}% on SMAF server" | mail -s "SMAF Warning" admin@inapesca.gob.mx
+else
+    echo "[$DATE] Disk space: OK (${USAGE}%)" >> $LOG_FILE
+fi
+
+# Check file upload directory permissions
+if [ -w "/var/www/InapescaWeb/PDF" ] && [ -w "/var/www/InapescaWeb/XML" ]; then
+    echo "[$DATE] Upload directories: OK" >> $LOG_FILE
+else
+    echo "[$DATE] Upload directories: PERMISSION ERROR" >> $LOG_FILE
+    echo "Upload directories have incorrect permissions" | mail -s "SMAF Alert" admin@inapesca.gob.mx
+fi
+
+echo "[$DATE] Health check completed" >> $LOG_FILE
+```
+
+### Schedule Health Checks
+
+```bash
+# Run health check every 15 minutes
+crontab -e
+```
+
+Add:
+
+```text
+*/15 * * * * /usr/local/bin/smaf-health-check.sh
+```
+
+## Alert Configuration
+
+### Critical Alerts
+
+<Accordion title="Alert Thresholds">
+
+**Database Alerts:**
+- Connection pool exhaustion (> 90% utilized)
+- Slow queries (> 5 seconds execution time)
+- Deadlock detection
+- Replication lag (> 60 seconds)
+
+**Application Alerts:**
+- Login failures (> 10 attempts in 5 minutes)
+- Session timeout rate (> 30% of sessions)
+- File upload failures (> 5% failure rate)
+- XML validation errors (> 10% error rate)
+
+**System Alerts:**
+- CPU usage (> 80% for 5 minutes)
+- Memory usage (> 85%)
+- Disk space (> 85% utilized)
+- Network connectivity loss
+
+**Security Alerts:**
+- Multiple failed login attempts (> 5 from same IP)
+- Unauthorized access attempts
+- Configuration file modifications
+- Suspicious database queries
+
+</Accordion>
+
+### Email Alert Configuration
+
+```bash
+# Configure mail alerts
+apt-get install mailutils  # On Linux
+
+# Test email
+echo "Test alert from SMAF" | mail -s "SMAF Test" admin@inapesca.gob.mx
+```
+
+## Monitoring Dashboard Integration
+
+### Grafana Integration (Optional)
+
+For advanced monitoring, integrate with Grafana:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'smaf_mysql'
+    static_configs:
+      - targets: ['localhost:9104']
+    
+  - job_name: 'smaf_application'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+### Key Metrics to Track
+
+<CardGroup cols={3}>
+  <Card title="Database Metrics" icon="database">
+    - Queries per second
+    - Connection count
+    - Query latency
+    - Table sizes
+  </Card>
+  <Card title="Application Metrics" icon="server">
+    - Request rate
+    - Response time
+    - Error rate
+    - Active sessions
+  </Card>
+  <Card title="Business Metrics" icon="chart-line">
+    - Commissions per day
+    - Payment references generated
+    - XML uploads processed
+    - User activity
+  </Card>
+</CardGroup>
+
+## Log File Locations
+
+### Application Logs
+
+```text
+/var/log/smaf/
+├── application.log          # Main application log
+├── error.log               # Error log
+├── smaf-backup.log        # Backup script log
+├── smaf-files-backup.log  # File backup log
+├── smaf-health.log        # Health check log
+└── restore-test.log       # Restore test log
+```
+
+### IIS Logs
+
+```text
+C:\inetpub\logs\LogFiles\W3SVC1\
+```
+
+### MySQL Logs
+
+```text
+/var/log/mysql/
+├── error.log              # MySQL error log
+├── slow-query.log         # Slow query log
+└── general.log            # General query log (if enabled)
+```
+
+## Monitoring Best Practices
+
+<Steps>
+
+<Step title="Establish baselines">
+Document normal system behavior:
+- Average query response times
+- Typical daily transaction volumes
+- Standard resource utilization
+- Normal error rates
+</Step>
+
+<Step title="Set up proactive monitoring">
+- Configure automated health checks
+- Establish alert thresholds
+- Create escalation procedures
+- Document on-call procedures
+</Step>
+
+<Step title="Regular review and tuning">
+- Weekly review of performance metrics
+- Monthly review of alert effectiveness
+- Quarterly review of monitoring strategy
+- Annual capacity planning review
+</Step>
+
+<Step title="Maintain monitoring documentation">
+- Keep runbooks updated
+- Document alert resolution procedures
+- Maintain contact lists
+- Update monitoring dashboards
+</Step>
+
+</Steps>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Backup and Restore" href="/admin/backup-restore" icon="database">
+    Database and file backup procedures
+  </Card>
+  <Card title="Troubleshooting" href="/admin/troubleshooting" icon="wrench">
+    Common issues and resolution steps
+  </Card>
+</CardGroup>

@@ -1,0 +1,481 @@
+---
+title: 'DatosComprobacion Entity'
+description: 'Expense verification and reimbursement calculation entity for travel allowance reconciliation'
+---
+
+## Overview
+
+The `DatosComprobacion` class manages comprehensive expense verification data for travel assignments. It calculates totals for advance payments (anticipados) and accrued expenses (devengados), tracking verified receipts across multiple expense categories including per diem, fuel, tolls, and passenger fares.
+
+```csharp
+namespace InapescaWeb.Entidades
+{
+    public class DatosComprobacion
+    {
+        // Financial calculation properties using double precision
+        private double pdTotalComprobado;
+        private double pdTotalViaticosAnt;
+        // ... 40+ numeric properties
+    }
+}
+```
+
+**Source:** `InapescaWeb.Entidades/DatosComprobacion.cs`
+
+<Info>
+  This entity uses `double` data type for all financial calculations to maintain precision in monetary computations and expense reconciliation.
+</Info>
+
+## Constructor and Initialization
+
+The constructor initializes all numeric properties to zero:
+
+```csharp
+public DatosComprobacion()
+{
+    // General totals
+    pdTotalImporteReintegro = 0;
+    pdTotalComprobadoTarjeta = 0;
+    pdGranTotal = 0;
+    
+    // Category totals
+    pdTotalComprobado = 0;
+    pdTotalComprobadoViaticos = 0;
+    pdTotalComprobadoCombustible = 0;
+    
+    // Advance and accrued separately
+    pdTotalComprobadoAnt = 0;
+    pdTotalComprobadoDev = 0;
+    
+    // ... all properties initialized to 0
+}
+```
+
+## General Totals
+
+### Grand Total Properties
+
+<ParamField path="GranTotal" type="double">
+  Grand total of all expenses across all categories and payment types
+</ParamField>
+
+<ParamField path="TotalComprobado" type="double">
+  Total verified/documented expenses (sum of all categories)
+</ParamField>
+
+<ParamField path="TotalImporteReintegro" type="double">
+  Total amount to be reimbursed to the employee or returned to the institution
+</ParamField>
+
+<ParamField path="TotalComprobadoTarjeta" type="double">
+  Total expenses paid via institutional credit/debit card
+</ParamField>
+
+## Expense Categories - Overall
+
+### Per Diem (Viaticos)
+
+<ParamField path="TotalComprobadoViaticos" type="double">
+  Total verified per diem expenses (all types combined)
+</ParamField>
+
+<ParamField path="TotalViaticosRurales" type="double">
+  Total per diem for rural zone travel (lower daily rate)
+</ParamField>
+
+<ParamField path="TotalViaticosNavegados" type="double">
+  Total per diem for navigated days (maritime assignments)
+</ParamField>
+
+<ParamField path="TotalCompHospedaje" type="double">
+  Total lodging/accommodation expenses
+</ParamField>
+
+### Fuel (Combustible)
+
+<ParamField path="TotalComprobadoCombustible" type="double">
+  Total verified fuel expenses
+</ParamField>
+
+### Tolls (Peaje)
+
+<ParamField path="TotalComprobadoPeaje" type="double">
+  Total verified toll/highway charges
+</ParamField>
+
+<ParamField path="TotalCompPeajeNoFact" type="double">
+  Total toll expenses without tax invoice (non-fiscal receipts)
+</ParamField>
+
+### Passenger Fares (Pasaje)
+
+<ParamField path="TotalComprobadoPasaje" type="double">
+  Total verified passenger transportation fares (flights, buses, etc.)
+</ParamField>
+
+### Special Categories
+
+<ParamField path="TotalCompSingladura" type="double">
+  Total expenses for singladuras (24-hour maritime navigation periods)
+</ParamField>
+
+<ParamField path="TotalCompRural" type="double">
+  Total expenses for rural zone assignments
+</ParamField>
+
+<ParamField path="TotalComprobadoNoFiscal" type="double">
+  Total expenses documented with non-fiscal receipts (no tax invoice)
+</ParamField>
+
+<ParamField path="MaxNofiscalAnt" type="double">
+  Maximum allowed non-fiscal expenses for advance payments
+</ParamField>
+
+<ParamField path="MaxNofiscalDev" type="double">
+  Maximum allowed non-fiscal expenses for accrued payments
+</ParamField>
+
+<ParamField path="TotalCompReintegro" type="double">
+  Total amount requiring reimbursement processing
+</ParamField>
+
+## Advance Payments (Anticipados)
+
+Advance payments are amounts provided to employees before travel begins.
+
+### Advance Totals
+
+<ParamField path="TotalComprobadoAnt" type="double">
+  Total documented expenses from advance payment funds
+</ParamField>
+
+<ParamField path="DiasAnt" type="double">
+  Number of days covered by advance payment
+</ParamField>
+
+<ParamField path="TotalTotalAnt" type="double">
+  Grand total of advance payment allocation
+</ParamField>
+
+### Advance by Category
+
+<ParamField path="TotalComprobadoViaticosAnt" type="double">
+  Verified per diem expenses paid from advance
+</ParamField>
+
+<ParamField path="TotalViaticosAnt" type="double">
+  Total per diem amount in advance payment
+</ParamField>
+
+<ParamField path="TotalComprobadoCombustibleAnt" type="double">
+  Verified fuel expenses paid from advance
+</ParamField>
+
+<ParamField path="TotalCombustibleAnt" type="double">
+  Total fuel amount in advance payment
+</ParamField>
+
+<ParamField path="TotalComprobadoPasajeAnt" type="double">
+  Verified passenger fare expenses paid from advance
+</ParamField>
+
+<ParamField path="TotalPasajeAnt" type="double">
+  Total passenger fare amount in advance payment
+</ParamField>
+
+<ParamField path="TotalComprobadoPeajeAnt" type="double">
+  Verified toll expenses paid from advance
+</ParamField>
+
+<ParamField path="TotalPeajeAnt" type="double">
+  Total toll amount in advance payment
+</ParamField>
+
+### Advance Extensions (Ampliaciones)
+
+<ParamField path="TotalCombAmpAnt" type="double">
+  Additional fuel amount for advance payment extensions
+</ParamField>
+
+<ParamField path="TotalPeajeAmpAnt" type="double">
+  Additional toll amount for advance payment extensions
+</ParamField>
+
+<ParamField path="TotalPasajeAmpAnt" type="double">
+  Additional passenger fare amount for advance payment extensions
+</ParamField>
+
+## Accrued Expenses (Devengados)
+
+Accrued expenses are amounts paid after travel is completed, based on actual expenses incurred.
+
+### Accrued Totals
+
+<ParamField path="TotalComprobadoDev" type="double">
+  Total documented expenses for accrued payment
+</ParamField>
+
+<ParamField path="DiasDev" type="double">
+  Number of days covered by accrued payment
+</ParamField>
+
+<ParamField path="TotalTotalDev" type="double">
+  Grand total of accrued payment allocation
+</ParamField>
+
+### Accrued by Category
+
+<ParamField path="TotalComprobadoViaticosDev" type="double">
+  Verified per diem expenses for accrued payment
+</ParamField>
+
+<ParamField path="TotalViaticosDev" type="double">
+  Total per diem amount for accrued payment
+</ParamField>
+
+<ParamField path="TotalComprobadoCombustibleDev" type="double">
+  Verified fuel expenses for accrued payment
+</ParamField>
+
+<ParamField path="TotalCombustibleDev" type="double">
+  Total fuel amount for accrued payment
+</ParamField>
+
+<ParamField path="TotalComprobadoPasajeDev" type="double">
+  Verified passenger fare expenses for accrued payment
+</ParamField>
+
+<ParamField path="TotalPasajeDev" type="double">
+  Total passenger fare amount for accrued payment
+</ParamField>
+
+<ParamField path="TotalComprobadoPeajeDev" type="double">
+  Verified toll expenses for accrued payment
+</ParamField>
+
+<ParamField path="TotalPeajeDev" type="double">
+  Total toll amount for accrued payment
+</ParamField>
+
+### Accrued Extensions (Ampliaciones)
+
+<ParamField path="TotalCombAmpDev" type="double">
+  Additional fuel amount for accrued payment extensions
+</ParamField>
+
+<ParamField path="TotalPeajeAmpDev" type="double">
+  Additional toll amount for accrued payment extensions
+</ParamField>
+
+<ParamField path="TotalPasajeAmpDev" type="double">
+  Additional passenger fare amount for accrued payment extensions
+</ParamField>
+
+## Usage Example
+
+```csharp
+using InapescaWeb.Entidades;
+
+// Create expense verification record
+var datos = new DatosComprobacion();
+
+// Advance payment verification
+datos.DiasAnt = 5;
+datos.TotalViaticosAnt = 5000.00;
+datos.TotalCombustibleAnt = 1500.00;
+datos.TotalPasajeAnt = 2800.00;
+datos.TotalTotalAnt = 9300.00;
+
+// Verified expenses from advance
+datos.TotalComprobadoViaticosAnt = 4850.00;
+datos.TotalComprobadoCombustibleAnt = 1480.00;
+datos.TotalComprobadoPasajeAnt = 2800.00;
+datos.TotalComprobadoAnt = 9130.00;
+
+// Accrued expenses (additional days)
+datos.DiasDev = 2;
+datos.TotalViaticosDev = 2000.00;
+datos.TotalCombustibleDev = 600.00;
+datos.TotalTotalDev = 2600.00;
+
+// Verified accrued expenses
+datos.TotalComprobadoViaticosDev = 1950.00;
+datos.TotalComprobadoCombustibleDev = 580.00;
+datos.TotalComprobadoDev = 2530.00;
+
+// Calculate grand totals
+datos.TotalComprobado = datos.TotalComprobadoAnt + datos.TotalComprobadoDev;
+datos.GranTotal = datos.TotalTotalAnt + datos.TotalTotalDev;
+
+// Calculate reimbursement
+// (Total allocated - Total verified)
+double totalAllocated = datos.TotalTotalAnt + datos.TotalTotalDev;
+double totalVerified = datos.TotalComprobado;
+datos.TotalImporteReintegro = totalAllocated - totalVerified;
+
+// If negative, employee should return funds
+// If positive, additional reimbursement to employee
+
+Console.WriteLine($"Total Allocated: ${totalAllocated:N2}");
+Console.WriteLine($"Total Verified: ${totalVerified:N2}");
+Console.WriteLine($"Reimbursement: ${datos.TotalImporteReintegro:N2}");
+```
+
+## Calculation Patterns
+
+### Category Totals
+
+```csharp
+// Total verified expenses = sum of all categories
+TotalComprobado = TotalComprobadoViaticos 
+                + TotalComprobadoCombustible 
+                + TotalComprobadoPasaje 
+                + TotalComprobadoPeaje;
+```
+
+### Advance vs Accrued
+
+```csharp
+// Separate verification for advance and accrued
+TotalComprobadoAnt = TotalComprobadoViaticosAnt
+                   + TotalComprobadoCombustibleAnt
+                   + TotalComprobadoPasajeAnt
+                   + TotalComprobadoPeajeAnt;
+
+TotalComprobadoDev = TotalComprobadoViaticosDev
+                   + TotalComprobadoCombustibleDev
+                   + TotalComprobadoPasajeDev
+                   + TotalComprobadoPeajeDev;
+```
+
+### Reimbursement Calculation
+
+```csharp
+// If verified < allocated: employee returns money
+// If verified > allocated: institution pays employee
+TotalImporteReintegro = (TotalTotalAnt + TotalTotalDev) 
+                      - (TotalComprobadoAnt + TotalComprobadoDev);
+```
+
+## Business Rules
+
+<Warning>
+  Validation should be implemented in the business logic layer, not in the entity itself.
+</Warning>
+
+### Non-Fiscal Receipt Limits
+
+```csharp
+if (TotalComprobadoNoFiscal > MaxNofiscalAnt + MaxNofiscalDev)
+{
+    // Exceeds maximum allowed non-fiscal receipts
+    // Reject or require additional fiscal invoices
+}
+```
+
+### Category Verification
+
+```csharp
+// Verified amounts should not exceed allocated amounts
+if (TotalComprobadoViaticosAnt > TotalViaticosAnt)
+{
+    // Per diem verification exceeds advance allocation
+    // Possible data entry error
+}
+```
+
+### Per Diem Rate Validation
+
+```csharp
+// Verify daily rate matches zone classification
+double dailyRate = TotalViaticosAnt / DiasAnt;
+// Compare against official rate tables
+```
+
+## CFDI Integration
+
+<Info>
+  Mexican tax regulations require CFDI (Comprobante Fiscal Digital por Internet) for expense verification. The system processes CFDI XML files to extract and validate expense data.
+</Info>
+
+### Related CFDI Entities
+
+- `cfdv33` - CFDI version 3.3 invoices
+- `cfdv4` - CFDI version 4.0 invoices
+- `cfdiv33` - CFDI income version 3.3
+- `cfdiv4` - CFDI income version 4.0
+
+These entities parse XML invoice data to populate the verification totals in `DatosComprobacion`.
+
+## Related Entities
+
+<CardGroup cols={2}>
+  <Card title="Comision" icon="plane" href="./comision">
+    Travel assignment that these expenses verify
+  </Card>
+  <Card title="comprobacion" icon="file-invoice">
+    Individual expense line items
+  </Card>
+  <Card title="Xml" icon="file-code">
+    CFDI XML invoice parsing
+  </Card>
+  <Card title="Pagos" icon="money-bill">
+    Payment processing records
+  </Card>
+</CardGroup>
+
+## Reporting and Analysis
+
+### Expense Summary Report
+
+```csharp
+public class ExpenseReport
+{
+    public void PrintSummary(DatosComprobacion datos)
+    {
+        Console.WriteLine("=== EXPENSE VERIFICATION SUMMARY ===")
+        Console.WriteLine();
+        
+        Console.WriteLine("ADVANCE PAYMENT:");
+        Console.WriteLine($"  Days: {datos.DiasAnt}");
+        Console.WriteLine($"  Per Diem: ${datos.TotalViaticosAnt:N2}");
+        Console.WriteLine($"  Fuel: ${datos.TotalCombustibleAnt:N2}");
+        Console.WriteLine($"  Tolls: ${datos.TotalPeajeAnt:N2}");
+        Console.WriteLine($"  Fares: ${datos.TotalPasajeAnt:N2}");
+        Console.WriteLine($"  TOTAL: ${datos.TotalTotalAnt:N2}");
+        Console.WriteLine();
+        
+        Console.WriteLine("ADVANCE VERIFIED:");
+        Console.WriteLine($"  Per Diem: ${datos.TotalComprobadoViaticosAnt:N2}");
+        Console.WriteLine($"  Fuel: ${datos.TotalComprobadoCombustibleAnt:N2}");
+        Console.WriteLine($"  Tolls: ${datos.TotalComprobadoPeajeAnt:N2}");
+        Console.WriteLine($"  Fares: ${datos.TotalComprobadoPasajeAnt:N2}");
+        Console.WriteLine($"  TOTAL: ${datos.TotalComprobadoAnt:N2}");
+        Console.WriteLine();
+        
+        Console.WriteLine("ACCRUED PAYMENT:");
+        Console.WriteLine($"  Days: {datos.DiasDev}");
+        Console.WriteLine($"  Per Diem: ${datos.TotalViaticosDev:N2}");
+        Console.WriteLine($"  Fuel: ${datos.TotalCombustibleDev:N2}");
+        Console.WriteLine($"  TOTAL: ${datos.TotalTotalDev:N2}");
+        Console.WriteLine();
+        
+        Console.WriteLine("REIMBURSEMENT:");
+        Console.WriteLine($"  Amount: ${datos.TotalImporteReintegro:N2}");
+        if (datos.TotalImporteReintegro < 0)
+            Console.WriteLine($"  Status: Employee returns ${Math.Abs(datos.TotalImporteReintegro):N2}");
+        else if (datos.TotalImporteReintegro > 0)
+            Console.WriteLine($"  Status: Institution pays ${datos.TotalImporteReintegro:N2}");
+        else
+            Console.WriteLine($"  Status: Balanced - no reimbursement needed");
+    }
+}
+```
+
+## See Also
+
+- [Entity Overview](./overview) - Entity layer architecture
+- [Comision Entity](./comision) - Travel assignment entity
+- [Expense Verification Process](../business-logic/expense-verification) - Business rules
+- [CFDI Processing](../integration/cfdi) - Mexican tax invoice integration
+- [Payment Processing](../business-logic/payments) - Reimbursement workflows

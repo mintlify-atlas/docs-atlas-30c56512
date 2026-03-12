@@ -1,0 +1,884 @@
+---
+title: Database Setup
+description: Complete guide to setting up and managing the MySQL database for SMAF
+---
+
+# Database Setup
+
+This guide covers the installation, configuration, and maintenance of the MySQL database for SMAF (Sistema de Manejo y Administración de Fondos).
+
+## Database Overview
+
+SMAF uses MySQL 5.6+ with the InnoDB storage engine. The database schema is named `inapesca_cripsc` and contains:
+
+- **28 tables** for core functionality
+- **Foreign key constraints** for referential integrity
+- **Indexes** for optimized query performance
+- **Initial data** for system catalogs and configuration
+
+## MySQL Installation
+
+<Steps>
+
+<Step title="Download MySQL Server">
+
+Download MySQL Community Server 5.6 or higher:
+
+```bash
+# For Windows Server
+Invoke-WebRequest -Uri "https://dev.mysql.com/downloads/mysql/5.6.html" -OutFile "mysql-installer.msi"
+```
+
+**Recommended Version**: MySQL 5.6.17 (as indicated in schema file)
+
+</Step>
+
+<Step title="Install MySQL Server">
+
+Run the MySQL installer:
+
+```powershell
+# Install MySQL Server
+Start-Process msiexec.exe -ArgumentList "/i mysql-installer.msi /quiet /qn" -Wait
+```
+
+**Installation Options**:
+- Server Type: Development Machine or Server Machine
+- Port: 3306 (default)
+- Root Password: Set a strong password
+- Character Set: UTF-8 (utf8_general_ci)
+
+</Step>
+
+<Step title="Configure MySQL Service">
+
+```powershell
+# Start MySQL service
+Start-Service MySQL57
+
+# Set service to start automatically
+Set-Service MySQL57 -StartupType Automatic
+```
+
+</Step>
+
+<Step title="Verify Installation">
+
+```bash
+# Connect to MySQL
+mysql -u root -p
+
+# Check version
+SELECT VERSION();
+```
+
+Expected output: `5.6.17` or higher
+
+</Step>
+
+</Steps>
+
+## Database Creation
+
+### Create Database User
+
+Create a dedicated user for SMAF:
+
+```sql
+-- Connect as root
+mysql -u root -p
+
+-- Create database user
+CREATE USER 'smaf_user'@'localhost' IDENTIFIED BY 'secure_password_here';
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON inapesca_cripsc.* TO 'smaf_user'@'localhost';
+
+-- For remote access (if needed)
+CREATE USER 'smaf_user'@'%' IDENTIFIED BY 'secure_password_here';
+GRANT ALL PRIVILEGES ON inapesca_cripsc.* TO 'smaf_user'@'%';
+
+-- Apply changes
+FLUSH PRIVILEGES;
+```
+
+<Warning>
+Use a strong password for the database user. Never use default or easily guessable passwords in production.
+</Warning>
+
+### Import Database Schema
+
+<Steps>
+
+<Step title="Locate SQL Schema File">
+
+The schema file is located at: `inapesca_cripsc.sql`
+
+</Step>
+
+<Step title="Import Schema">
+
+```bash
+# Import database schema
+mysql -u root -p < inapesca_cripsc.sql
+
+# Or import to specific database
+mysql -u root -p inapesca_cripsc < inapesca_cripsc.sql
+```
+
+**Import Details**:
+- Source Server: MySQL 5.6.17
+- Database: inapesca_cripsc
+- Character Set: latin1 (UTF-8 compatible)
+- Storage Engine: InnoDB
+
+</Step>
+
+<Step title="Verify Import">
+
+```sql
+-- Connect to database
+mysql -u root -p inapesca_cripsc
+
+-- Show tables
+SHOW TABLES;
+
+-- Verify table count (should be 28)
+SELECT COUNT(*) FROM information_schema.tables 
+WHERE table_schema = 'inapesca_cripsc';
+```
+
+</Step>
+
+</Steps>
+
+## Database Schema
+
+### Core Tables
+
+The database includes the following core tables:
+
+#### User Management
+
+```sql
+-- User accounts
+crip_usuarios
+  - USUARIO (PK): User ID
+  - PASSWORD: Encrypted password
+  - EMAIL_INST: Institutional email
+  - NOMBRE: First name
+  - APAT: Paternal surname
+  - AMAT: Maternal surname
+  - RFC: Tax identification number
+
+-- User roles
+crip_roles
+  - CLV_ROL (PK): Role code
+  - DESCR: Role description
+  - DESC_LARGA: Detailed description
+
+-- User job assignments
+crip_job
+  - USUARIO (PK, FK): User ID
+  - CLV_NIVEL: Level code
+  - CLV_PLAZA: Position code
+  - CLV_PUESTO: Job title
+  - CLV_PROY: Project code
+  - ROL: Role code
+  - ESTATUS: Status (active/inactive)
+```
+
+#### Organizational Structure
+
+```sql
+-- Secretariats
+crip_secretaria
+  - CLV_SECRETARIA (PK): Secretariat code
+  - DESCRIPCION: Description
+  - DESC_CORTA: Short description
+
+-- Organizations
+crip_organismos
+  - CLV_ORG (PK): Organization code
+  - DESCRIP: Description
+  - CLV_SECRETARIA (FK): Parent secretariat
+
+-- Departments
+crip_dependencia
+  - CLV_DEP (PK): Department code
+  - DESCRIPCION: Description
+  - CLV_SECRE (FK): Secretariat code
+  - CLV_ORG (FK): Organization code
+  - CLV_DIR (FK): Direction code
+
+-- Areas
+crip_area
+  - CLV_AREA (PK): Area code
+  - DESCRIPCION: Description
+  - CLV_DEP (FK): Department code
+```
+
+#### Project Management
+
+```sql
+-- Projects
+crip_proy
+  - CLV-PROY (PK): Project code
+  - DESCRIPCION: Description
+  - RESPONSABLE (FK): Responsible user
+  - OBJETIVO: Objective
+  - PERIODO: Period
+  - CLV_DEP (FK): Department
+  - CLV_AREA (FK): Area
+  - RECURSO: Budget amount
+  - RESTANTE: Remaining budget
+  - ESTATUS: Status
+```
+
+#### Expense Management
+
+```sql
+-- Travel authorizations
+crip_comision
+  - CVL_OFICIO (PK, FK): Office type
+  - FOLIO (PK): Folio number
+  - FECHA_SOL: Request date
+  - FECHA_AUTORIZA: Authorization date
+  - CLV_DEP (FK): Department
+  - CLV_AREA (FK): Area
+  - CLV_PROY (FK): Project
+  - LUGAR: Destination
+  - FECHA_I: Start date
+  - FECHA_F: End date
+  - OBJETIVO: Objective
+  - CLV_CLASE: Transportation class
+  - ESTATUS: Status
+
+-- Budget line items
+crip_partidas
+  - ID (PK): Line item code
+  - DESCRIPCION: Description
+  - PADRE: Parent line item
+  - PERIODO: Fiscal period
+  - ESTATUS: Status
+```
+
+#### Catalog Tables
+
+```sql
+-- Status codes
+crip_estatus
+  - CLV_ESTATUS (PK): Status code
+  - DESCRIPCION: Description
+  Values: 0=INACTIVE, 1=ACTIVE, 2=CANCELLED, 3=REJECTED
+
+-- Geographic locations
+crip_pais (Countries)
+crip_estado (States)
+crip_ciudad (Cities)
+
+-- Transportation types
+crip_transporte
+  - CLV_TRANSPORTE (PK): Transport code
+  - CLV_CLASE: Class
+  - TIPO: Type
+
+-- Payment methods
+crip_mviaticos
+  - CLV_MET (PK): Method code
+  - DESCR: Description
+  Values: 0=NOT APPLICABLE, 1=ACCRUED, 2=DEPOSIT
+```
+
+### Foreign Key Relationships
+
+The database enforces referential integrity through foreign keys:
+
+```sql
+-- Example: User job assignments
+ALTER TABLE crip_job
+  ADD CONSTRAINT CLV_USUARIOS 
+  FOREIGN KEY (USUARIO) REFERENCES crip_usuarios(USUARIO);
+
+-- Example: Project area relationship
+ALTER TABLE crip_proy
+  ADD CONSTRAINT crip_proy_ibfk_4 
+  FOREIGN KEY (CLV_AREA) REFERENCES crip_area(CLV_AREA);
+
+-- Example: Commission dependencies
+ALTER TABLE crip_comision
+  ADD CONSTRAINT crip_comision_ibfk_15 
+  FOREIGN KEY (CLV_PROY) REFERENCES crip_proy(CLV-PROY);
+```
+
+<Note>
+Foreign keys ensure data consistency and prevent orphaned records. The schema uses InnoDB engine for full foreign key support.
+</Note>
+
+### Indexes
+
+Key indexes for performance optimization:
+
+```sql
+-- User table indexes
+KEY USUARIO (crip_usuarios)
+KEY EMAIL_INST (crip_usuarios)
+
+-- Project indexes
+KEY CLV_PROY (crip_proy)
+KEY RESPONSABLE (crip_proy)
+KEY CLV_AREA (crip_proy)
+
+-- Commission indexes
+KEY FOLIO (crip_comision)
+KEY FECHA_I (crip_comision)
+KEY FECHA_F (crip_comision)
+KEY ESTATUS (crip_comision)
+
+-- Geographic indexes
+KEY CLV_ESTADO (crip_estado)
+KEY CLV_CIUDAD (crip_ciudad)
+```
+
+## Initial Data
+
+The schema file includes initial data for:
+
+### System Status Codes
+
+```sql
+INSERT INTO crip_estatus VALUES 
+  (0, 'INACTIVO'),
+  (1, 'ACTIVO'),
+  (2, 'CANCELADO'),
+  (3, 'RECHAZADO'),
+  (4, 'EN TRAMITE DE BAJA');
+```
+
+### User Roles
+
+```sql
+INSERT INTO crip_roles VALUES 
+  ('ADMGR', 'ADMINISTRADOR GENERAL', 'ROL CREADO PARA EL DBA - SYSTEM'),
+  ('ADMINP', 'ADMINISTRADOR INAPESCA', 'ROL CREADO PARA ELADMINISTRADOR GRAL DE INAPESCA'),
+  ('ADMCRIPSC', 'ADMINISTRADOR CRIP SALINACRUZ', 'ROL CREADO PARA EL ADMINISTRADOR DELCRIP SALINA CRUZ'),
+  ('JFCCRIPSC', 'JEFE DE CENTRO SALINA CRUZ', 'ROL CREADO PARA JEFE DE CENTRO SALINA CRUZ'),
+  ('INVEST', 'INVESTIGADOR', 'ROL CREADO PARA INVESTIGADORES (USUARIOS SIN PRIVILEGIOS DE ADMINISTRADOR)');
+```
+
+### Budget Line Items (Partidas Presupuestales)
+
+Over 150 budget line items for fiscal year 2015:
+
+```sql
+INSERT INTO crip_partidas VALUES 
+  ('2000', 'MATERIALES Y SUMINISTROS', '0', 1, '2015'),
+  ('3000', 'SERVICIOS', '0', 1, '2015'),
+  ('37504', 'VIÁTICOS NACIONALES PARA SERVIDORES PÚBLICOS EN EL DESEMPEÑO DE FUNCIONES OFICIALES', '3700', 1, '2015'),
+  -- ... many more line items
+```
+
+### Organizational Structure
+
+```sql
+-- Secretariat
+INSERT INTO crip_secretaria VALUES ('SAGARPA', 'SECRETARIA DE AGRICULTURA GANADERIA DESARROLLO RURAL PESCA Y ALIMENTACION', 'SAGARPA');
+
+-- Organizations
+INSERT INTO crip_organismos VALUES ('INAPESCA', 'INSTITUTO NACIONAL DE PESCA', 'INSTITUTO NACIONALDE PESCA', 1, '2014-11-02', '2014-11-02', 1, 'SAGARPA');
+
+-- Departments
+INSERT INTO crip_dependencia VALUES ('CRIP-SC', 'CENTRO REGIONAL DE INVESTIGACION PESQUERA SALINA CRUZ', 'CRIP SALINA CRUZ', 'SAGARPA', 'INAPESCA', 'DGAIPP', ...);
+
+-- Areas
+INSERT INTO crip_area VALUES 
+  ('CRIPSC01', 'ADMINISTRACION', 'CRIP-SC'),
+  ('CRIPSC02', 'TIBURON', 'CRIP-SC'),
+  ('CRIPSC03', 'ACUACULTURA', 'CRIP-SC'),
+  -- ... more areas
+```
+
+### Sample Projects
+
+```sql
+INSERT INTO crip_proy VALUES 
+  ('CRIPSC000', 'ADMINISTRACION', 'MOPO670124CX7', 'ADMINISTRACION', '2014', 1, 1, '2014-01-01', '2014-01-01', 'CRIP-SC', 'CRIPSC01', 1000000, 100000),
+  ('CRIPSC002', 'COORDINACION DE LA INVESTIGACION Y ATENCION AL SECTOR', 'MOPO670124CX7', 'COORDINACION DE LA INVESTIGACION Y ATENCION AL SECTOR', '2014', 1, 1, '2014-01-01', '2014-01-01', 'CRIP-SC', 'CRIPSC08', 1000000, 100000);
+```
+
+## Database Configuration
+
+### MySQL Configuration File (my.ini)
+
+Recommended settings for SMAF:
+
+```ini
+[mysqld]
+# Basic Settings
+port = 3306
+basedir = "C:/Program Files/MySQL/MySQL Server 5.6"
+datadir = "C:/ProgramData/MySQL/MySQL Server 5.6/Data"
+
+# Character Set
+character-set-server = utf8
+collation-server = utf8_general_ci
+
+# InnoDB Settings
+default-storage-engine = INNODB
+innodb_buffer_pool_size = 1G
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 2
+innodb_file_per_table = 1
+
+# Connection Settings
+max_connections = 200
+max_allowed_packet = 64M
+
+# Query Cache (for MySQL 5.6)
+query_cache_type = 1
+query_cache_size = 32M
+
+# Logging
+log-error = "C:/ProgramData/MySQL/MySQL Server 5.6/Data/error.log"
+slow_query_log = 1
+slow_query_log_file = "C:/ProgramData/MySQL/MySQL Server 5.6/Data/slow-query.log"
+long_query_time = 2
+
+# Binary Logging (for replication/backups)
+log-bin = mysql-bin
+binlog_format = ROW
+expire_logs_days = 7
+```
+
+### Restart MySQL After Configuration
+
+```powershell
+Restart-Service MySQL57
+```
+
+## User Setup
+
+### Create Initial Administrator
+
+The schema includes a sample administrator account. You should create your own:
+
+```sql
+-- Create user account
+INSERT INTO crip_usuarios VALUES (
+  'ADMIN001',
+  'encrypted_password_here',
+  'admin@institution.gob.mx',
+  'Administrator',
+  'System',
+  'User',
+  'ADMI000000XXX',
+  -- ... other fields
+);
+
+-- Assign administrator role
+INSERT INTO crip_job VALUES (
+  'ADMIN001',
+  'encrypted_password_here',
+  'admin@institution.gob.mx',
+  'ADMINISTRADOR',
+  'CFNA001',
+  '0001',
+  'ADMINISTRADOR DEL SISTEMA',
+  'SAGARPA',
+  'INAPESCA',
+  'CRIP-SC',
+  'CRIPSC01',
+  'CRIPSC000',
+  CURDATE(),
+  CURDATE(),
+  1,
+  1,
+  'ADMGR'
+);
+```
+
+<Warning>
+Always encrypt passwords before storing them in the database. Use the application's built-in encryption utility or bcrypt hashing.
+</Warning>
+
+## Database Maintenance
+
+### Backup Procedures
+
+#### Full Database Backup
+
+```bash
+# Backup entire database
+mysqldump -u root -p inapesca_cripsc > backup_$(date +%Y%m%d).sql
+
+# Backup with gzip compression
+mysqldump -u root -p inapesca_cripsc | gzip > backup_$(date +%Y%m%d).sql.gz
+
+# Backup specific tables
+mysqldump -u root -p inapesca_cripsc crip_usuarios crip_comision > users_commissions_backup.sql
+```
+
+#### Automated Backup Script (PowerShell)
+
+```powershell
+# backup-database.ps1
+$date = Get-Date -Format "yyyyMMdd_HHmmss"
+$backupPath = "C:\Backups\SMAF"
+$filename = "inapesca_cripsc_$date.sql"
+
+# Create backup directory if it doesn't exist
+New-Item -ItemType Directory -Force -Path $backupPath
+
+# Perform backup
+& "C:\Program Files\MySQL\MySQL Server 5.6\bin\mysqldump.exe" `
+  -u root -p`password` `
+  --single-transaction `
+  --routines `
+  --triggers `
+  inapesca_cripsc > "$backupPath\$filename"
+
+# Compress backup
+Compress-Archive -Path "$backupPath\$filename" -DestinationPath "$backupPath\$filename.zip"
+Remove-Item "$backupPath\$filename"
+
+# Delete backups older than 30 days
+Get-ChildItem -Path $backupPath -Filter "*.zip" | `
+  Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | `
+  Remove-Item
+```
+
+#### Schedule Backup Task
+
+```powershell
+# Create scheduled task for daily backups at 2 AM
+$action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-File C:\Scripts\backup-database.ps1"
+$trigger = New-ScheduledTaskTrigger -Daily -At 2am
+$principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -TaskName "SMAF_Database_Backup" -Description "Daily backup of SMAF database"
+```
+
+### Database Restoration
+
+```bash
+# Restore from backup
+mysql -u root -p inapesca_cripsc < backup_20260312.sql
+
+# Restore from compressed backup
+gunzip < backup_20260312.sql.gz | mysql -u root -p inapesca_cripsc
+```
+
+### Optimize Tables
+
+Regularly optimize tables for performance:
+
+```sql
+-- Optimize all tables
+USE inapesca_cripsc;
+
+-- Analyze tables
+ANALYZE TABLE crip_usuarios, crip_comision, crip_proy;
+
+-- Optimize tables
+OPTIMIZE TABLE crip_usuarios, crip_comision, crip_proy;
+
+-- Check table integrity
+CHECK TABLE crip_usuarios, crip_comision, crip_proy;
+```
+
+### Monitor Database Size
+
+```sql
+-- Check database size
+SELECT 
+  table_schema AS 'Database',
+  ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
+FROM information_schema.tables
+WHERE table_schema = 'inapesca_cripsc'
+GROUP BY table_schema;
+
+-- Check individual table sizes
+SELECT 
+  table_name AS 'Table',
+  ROUND(((data_length + index_length) / 1024 / 1024), 2) AS 'Size (MB)',
+  table_rows AS 'Rows'
+FROM information_schema.tables
+WHERE table_schema = 'inapesca_cripsc'
+ORDER BY (data_length + index_length) DESC;
+```
+
+## Performance Tuning
+
+### Query Optimization
+
+```sql
+-- Enable slow query log
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 2;
+
+-- Analyze slow queries
+SELECT * FROM mysql.slow_log ORDER BY query_time DESC LIMIT 10;
+
+-- Show query execution plan
+EXPLAIN SELECT * FROM crip_comision WHERE ESTATUS = 1;
+```
+
+### Index Management
+
+```sql
+-- Check missing indexes
+SELECT * FROM information_schema.statistics
+WHERE table_schema = 'inapesca_cripsc'
+ORDER BY table_name, index_name;
+
+-- Add index if needed
+CREATE INDEX idx_comision_fecha ON crip_comision(FECHA_SOL, FECHA_AUTORIZA);
+
+-- Remove unused indexes
+DROP INDEX index_name ON table_name;
+```
+
+### Connection Pool Settings
+
+In your application's data access layer:
+
+```csharp
+// Connection string with pooling
+string connectionString = "Server=localhost;" +
+                         "Database=inapesca_cripsc;" +
+                         "Uid=smaf_user;" +
+                         "Pwd=password;" +
+                         "Pooling=true;" +
+                         "Min Pool Size=5;" +
+                         "Max Pool Size=100;" +
+                         "Connection Timeout=30;" +
+                         "Charset=utf8;";
+```
+
+## Security Best Practices
+
+<Steps>
+
+<Step title="Principle of Least Privilege">
+
+Grant only necessary permissions:
+
+```sql
+-- Read-only user for reports
+CREATE USER 'smaf_readonly'@'localhost' IDENTIFIED BY 'password';
+GRANT SELECT ON inapesca_cripsc.* TO 'smaf_readonly'@'localhost';
+
+-- Application user with limited permissions
+CREATE USER 'smaf_app'@'localhost' IDENTIFIED BY 'password';
+GRANT SELECT, INSERT, UPDATE ON inapesca_cripsc.* TO 'smaf_app'@'localhost';
+REVOKE DELETE ON inapesca_cripsc.* FROM 'smaf_app'@'localhost';
+```
+
+</Step>
+
+<Step title="Enable Binary Logging">
+
+For audit trail and point-in-time recovery:
+
+```ini
+[mysqld]
+log-bin=mysql-bin
+binlog_format=ROW
+expire_logs_days=7
+```
+
+</Step>
+
+<Step title="Regular Security Audits">
+
+```sql
+-- Check user privileges
+SELECT user, host, Select_priv, Insert_priv, Update_priv, Delete_priv 
+FROM mysql.user;
+
+-- Check database privileges
+SELECT * FROM mysql.db WHERE Db = 'inapesca_cripsc';
+
+-- Remove anonymous users
+DELETE FROM mysql.user WHERE User='';
+FLUSH PRIVILEGES;
+```
+
+</Step>
+
+<Step title="Encrypt Sensitive Data">
+
+Use application-level encryption for:
+- Passwords (bcrypt or similar)
+- Personal identification numbers (RFC)
+- Bank account information
+- Confidential project data
+
+</Step>
+
+<Step title="Network Security">
+
+```sql
+-- Restrict remote access
+DELETE FROM mysql.user WHERE Host='%' AND User='root';
+
+-- Allow only specific hosts
+GRANT ALL PRIVILEGES ON inapesca_cripsc.* TO 'smaf_user'@'192.168.1.100' IDENTIFIED BY 'password';
+
+FLUSH PRIVILEGES;
+```
+
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Foreign key constraint failures">
+
+**Symptoms**: Cannot insert or update records, constraint violation errors
+
+**Solutions**:
+```sql
+-- Temporarily disable foreign key checks (use with caution)
+SET FOREIGN_KEY_CHECKS=0;
+-- Perform your operations
+SET FOREIGN_KEY_CHECKS=1;
+
+-- Check existing constraints
+SELECT * FROM information_schema.key_column_usage
+WHERE table_schema = 'inapesca_cripsc'
+AND referenced_table_name IS NOT NULL;
+```
+
+</Accordion>
+
+<Accordion title="Character encoding issues">
+
+**Symptoms**: Accented characters displaying incorrectly
+
+**Solutions**:
+```sql
+-- Check current charset
+SHOW VARIABLES LIKE 'character_set%';
+
+-- Set UTF-8 for connection
+SET NAMES 'utf8';
+
+-- Convert table charset
+ALTER TABLE crip_usuarios CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;
+```
+
+</Accordion>
+
+<Accordion title="Slow query performance">
+
+**Symptoms**: Long query execution times, timeout errors
+
+**Solutions**:
+```sql
+-- Check slow queries
+SHOW PROCESSLIST;
+
+-- Kill long-running query
+KILL query_id;
+
+-- Add missing indexes
+ANALYZE TABLE crip_comision;
+EXPLAIN SELECT * FROM crip_comision WHERE FECHA_SOL > '2024-01-01';
+
+-- Increase buffer pool size in my.ini
+innodb_buffer_pool_size = 2G
+```
+
+</Accordion>
+
+<Accordion title="Connection pool exhaustion">
+
+**Symptoms**: "Too many connections" error
+
+**Solutions**:
+```sql
+-- Check current connections
+SHOW PROCESSLIST;
+
+-- Increase max connections
+SET GLOBAL max_connections = 500;
+
+-- Check sleeping connections
+SELECT * FROM information_schema.processlist WHERE command = 'Sleep';
+
+-- Set connection timeout
+SET GLOBAL wait_timeout = 300;
+SET GLOBAL interactive_timeout = 300;
+```
+
+</Accordion>
+
+<Accordion title="InnoDB corruption">
+
+**Symptoms**: Cannot start MySQL, table crash errors
+
+**Solutions**:
+```bash
+# Check error log
+type "C:\ProgramData\MySQL\MySQL Server 5.6\Data\error.log"
+
+# Try InnoDB recovery
+# Add to my.ini:
+innodb_force_recovery = 1
+
+# Restart MySQL and dump database
+mysqldump -u root -p --all-databases > full_backup.sql
+
+# Remove recovery mode and restore
+# Remove innodb_force_recovery from my.ini
+# Restart MySQL
+mysql -u root -p < full_backup.sql
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Migration and Upgrades
+
+### Fiscal Year Migration
+
+When starting a new fiscal year:
+
+```sql
+-- Update partidas presupuestales for new year
+UPDATE crip_partidas SET PERIODO = '2025' WHERE PERIODO = '2024';
+
+-- Archive previous year's commissions
+CREATE TABLE crip_comision_2024 AS SELECT * FROM crip_comision WHERE YEAR(FECHA_SOL) = 2024;
+
+-- Update project budgets
+UPDATE crip_proy SET RECURSO = new_budget, RESTANTE = new_budget WHERE PERIODO = '2025';
+```
+
+### MySQL Version Upgrade
+
+Before upgrading MySQL:
+
+1. Full database backup
+2. Test upgrade on staging environment
+3. Review MySQL upgrade notes for breaking changes
+4. Update connection strings if needed
+5. Test application thoroughly
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="User Management" icon="users" href="/admin/user-management">
+Manage user accounts, roles, and permissions
+</Card>
+
+<Card title="Monitoring" icon="chart-line" href="/admin/monitoring">
+Monitor system performance and database health
+</Card>
+
+</CardGroup>

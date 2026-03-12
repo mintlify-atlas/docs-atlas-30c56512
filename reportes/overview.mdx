@@ -1,0 +1,296 @@
+---
+title: 'Reportes - Visión General'
+description: 'Sistema integral de reportes para control de viáticos y transparencia en SMAF'
+icon: 'chart-bar'
+---
+
+## Descripción General
+
+El módulo de Reportes de SMAF proporciona capacidades completas de generación de informes para el seguimiento y control de gastos de viaje, garantizando transparencia y cumplimiento normativo en la Administración Pública Federal Mexicana.
+
+<CardGroup cols={2}>
+  <Card title="Reportes de Viáticos" icon="file-invoice-dollar" href="./expense-reports">
+    Informes detallados de gastos de viaje con filtros avanzados y exportación a Excel
+  </Card>
+  <Card title="Reportes de Transparencia" icon="eye" href="./transparency-reports">
+    Reportes regulatorios para cumplimiento de obligaciones de transparencia pública
+  </Card>
+  <Card title="Reportes Financieros" icon="chart-line" href="./financial-reports">
+    Análisis presupuestario y reportes comparativos por programa
+  </Card>
+  <Card title="Análisis Estadísticos" icon="chart-pie">
+    Comparativos mensuales y análisis de tendencias de gastos
+  </Card>
+</CardGroup>
+
+## Tipos de Reportes
+
+### Reportes Operativos
+
+Reportes utilizados para la gestión diaria de comisiones y viáticos:
+
+- **Reporte de Viáticos**: Listado detallado de comisiones con montos autorizados y comprobados
+- **Reporte por Usuario**: Gastos individuales por comisionado
+- **Reporte por Proyecto**: Consumo presupuestal por proyecto de investigación
+- **Control de Reintegros**: Seguimiento de devoluciones pendientes
+
+### Reportes Ejecutivos
+
+- **Resumen Ejecutivo**: Consolidado por centro de investigación
+- **Resumen de Auditoría**: Información detallada para procesos de auditoría
+- **Comparativo Mensual**: Análisis de tendencias por período
+
+### Reportes Regulatorios
+
+- **Transparencia**: Cumplimiento con la Ley General de Transparencia
+- **Formato de Artículo 70**: Viajes nacionales e internacionales de funcionarios públicos
+
+## Características Principales
+
+### Filtros Avanzados
+
+Todos los reportes incluyen capacidades de filtrado:
+
+<AccordionGroup>
+  <Accordion title="Por Período">
+    - **Año Fiscal**: Selección de ejercicio presupuestal
+    - **Rango de Fechas**: Fecha inicio y fin de comisión
+    - **Período Mensual**: Filtrado por mes específico
+  </Accordion>
+  
+  <Accordion title="Por Tipo de Comisión">
+    - Nacional o Internacional
+    - Tipo de viáticos (Anticipados/Devengados)
+    - Estatus de comprobación
+  </Accordion>
+  
+  <Accordion title="Por Organización">
+    - Adscripción (Centro de Investigación)
+    - Programa o Proyecto
+    - Usuario comisionado
+  </Accordion>
+  
+  <Accordion title="Por Estado Financiero">
+    - Comprometido
+    - Prepagado
+    - Pagado
+    - Pagado Pasivo
+  </Accordion>
+</AccordionGroup>
+
+### Formatos de Exportación
+
+Los reportes pueden generarse en múltiples formatos:
+
+<Tabs>
+  <Tab title="Excel (.xls)">
+    **Formato Principal de Exportación**
+    
+    El sistema genera archivos Excel compatibles con análisis posterior:
+    
+    ```csharp
+    const string FIELDSEPARATOR = "\t";
+    const string ROWSEPARATOR = "\n";
+    StringBuilder output = new StringBuilder();
+    
+    // Escribir encabezados
+    foreach (DataColumn dc in tableFinal.Columns)
+    {
+        output.Append(dc.ColumnName);
+        output.Append(FIELDSEPARATOR);
+    }
+    output.Append(ROWSEPARATOR);
+    
+    // Escribir datos
+    foreach (DataRow item in tableFinal.Rows)
+    {
+        foreach (object value in item.ItemArray)
+        {
+            output.Append(value.ToString().Replace('\n', ' ').Replace('\r', ' '));
+            output.Append(FIELDSEPARATOR);
+        }
+        output.Append(ROWSEPARATOR);
+    }
+    
+    string raiz = HttpContext.Current.Server.MapPath("..") + "\\Reportes\\Excel\\" + nombreArchivo + ".xls";
+    StreamWriter sw = new StreamWriter(raiz);
+    sw.Write(output.ToString());
+    sw.Close();
+    
+    clsPdf.DonwloadFile(raiz, nombreArchivo + ".xls");
+    ```
+  </Tab>
+  
+  <Tab title="PDF">
+    **Reportes Formales**
+    
+    Utilizado para documentación oficial y archivo permanente. Generados con iTextSharp.
+  </Tab>
+</Tabs>
+
+## Estructura de Datos de Reportes
+
+### Campos Comunes
+
+Todos los reportes incluyen información básica:
+
+| Campo | Descripción | Ejemplo |
+|-------|-------------|----------|
+| **OFICIO** | Número de oficio de comisión | RJL-INAPESCA-001-2024 |
+| **ARCHIVO** | Identificador único | 001-2024 |
+| **COMISIONADO** | Nombre del funcionario | JUAN PÉREZ LÓPEZ |
+| **LUGAR** | Destino de la comisión | MAZATLÁN, SINALOA |
+| **FECHAS** | Período de comisión | 15/01/2024 - 18/01/2024 |
+
+### Montos Autorizados
+
+```csharp
+tableFinal.Columns.Add("PASAJES_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("PEAJES_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("COMBUSTIBLE_OTORGADO", typeof(Double));
+tableFinal.Columns.Add("VIATICOS_OTORGADOS", typeof(Double));
+tableFinal.Columns.Add("SINGLADURAS_OTORGADAS", typeof(Double));
+tableFinal.Columns.Add("TOTAL_OTORGADOS", typeof(Double));
+```
+
+### Montos Comprobados
+
+```csharp
+// Cálculo de comprobaciones por concepto
+workRow[11] = MngNegocioComprobacion.Sum_Importe(
+    comisionado, 
+    periodo, 
+    "8",  // Código de concepto: Pasajes
+    oficio, 
+    archivo
+);
+
+workRow[12] = MngNegocioComprobacion.Sum_Importe(
+    comisionado, 
+    periodo, 
+    "7",  // Código de concepto: Peajes
+    oficio, 
+    archivo
+);
+```
+
+## Programación de Reportes
+
+<Note>
+Los reportes se generan bajo demanda. Para grandes volúmenes de datos, el sistema muestra un mensaje de espera durante el proceso de generación.
+</Note>
+
+### Tiempo de Procesamiento
+
+```html
+<asp:Button ID="btnGenerar" runat="server"
+    Text="Generar Archivo de Transparencia" 
+    OnClick="btnGenerar_Click" 
+    OnClientClick="clickOnce(this, 'Espere este proceso puede tardar minutos')" 
+    ValidationGroup="Procesar" 
+    UseSubmitBehavior="false" />
+```
+
+```javascript
+function clickOnce(btn, msg) {
+    btn.value = msg;
+    btn.disabled = true;
+    return true;
+}
+```
+
+## Control de Acceso por Rol
+
+Los reportes disponibles dependen del rol del usuario:
+
+<CodeGroup>
+```csharp Administrador/Director
+if (Session["Crip_Rol"].ToString() == Dictionary.DIRECTOR_ADMINISTRACION)
+{
+    // Acceso a todos los centros de investigación
+    dplAdscripcion.DataSource = MngNegocioAdscripcion.ObtieneAdscripcion();
+    dplAdscripcion.DataTextField = Dictionary.DESCRIPCION;
+    dplAdscripcion.DataValueField = Dictionary.CODIGO;
+    dplAdscripcion.DataBind();
+    
+    // Opciones de resumen ejecutivo
+    CheckBox1.Visible = true;
+    CheckBox2.Visible = true;
+}
+```
+
+```csharp Jefe de Centro
+else if ((Session["Crip_Rol"].ToString() == Dictionary.ADMINISTRADOR) | 
+         (Session["Crip_Rol"].ToString() == Dictionary.JEFE_CENTRO))
+{
+    // Restringido a su centro de investigación
+    lsAdscripcion = Session["Crip_Ubicacion"].ToString();
+    
+    dplUsuarios.DataSource = MngNegocioUsuarios.MngBussinesUssers(
+        lsAdscripcion, 
+        Session["Crip_Usuario"].ToString(), 
+        "", 
+        true
+    );
+    dplUsuarios.DataTextField = Dictionary.DESCRIPCION;
+    dplUsuarios.DataValueField = Dictionary.CODIGO;
+    dplUsuarios.DataBind();
+}
+```
+</CodeGroup>
+
+## Validaciones y Controles
+
+### Validación de Parámetros
+
+```csharp
+if ((txtNombre.Text == "") | (txtNombre.Text == null) | (txtNombre.Text == string.Empty))
+{
+    ClientScript.RegisterStartupScript(
+        this.GetType(), 
+        "Inapesca", 
+        "alert('Nombre de archivo forzoso');", 
+        true
+    );
+    return;
+}
+
+if (dplAnio.SelectedValue.ToString() == string.Empty)
+{
+    ClientScript.RegisterStartupScript(
+        this.GetType(), 
+        "Inapesca", 
+        "alert('Debe seleccionar un ejercicio fiscal para poder avanzar');", 
+        true
+    );
+    return;
+}
+```
+
+### Manejo de Archivos Existentes
+
+```csharp
+string raiz = HttpContext.Current.Server.MapPath("..") + "\\Reportes\\Excel";
+
+if (File.Exists(raiz + "/" + txtNombre.Text + ".xls"))
+{
+    File.Delete(raiz + "/" + txtNombre.Text + ".xls");
+}
+```
+
+## Próximos Pasos
+
+<CardGroup cols={2}>
+  <Card title="Reportes de Viáticos" icon="file-invoice-dollar" href="./expense-reports">
+    Aprenda a generar reportes detallados de gastos
+  </Card>
+  <Card title="Reportes de Transparencia" icon="eye" href="./transparency-reports">
+    Configure reportes regulatorios de transparencia
+  </Card>
+  <Card title="Reportes Financieros" icon="chart-line" href="./financial-reports">
+    Analice presupuestos y programas
+  </Card>
+  <Card title="API de Reportes" icon="code">
+    Integre reportes en sistemas externos
+  </Card>
+</CardGroup>

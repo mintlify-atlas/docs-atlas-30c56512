@@ -1,0 +1,393 @@
+---
+title: 'Database Connection Management'
+description: 'Connection handling, encryption, and pooling in the SMAF Data Access Layer'
+---
+
+## MngConexion Class
+
+The `MngConexion` class centralizes all database connection management for SMAF. It provides static methods to obtain connections to different databases and ensures proper connection disposal.
+
+**Location:** `InapescaWeb.DAL/MngConexion.cs`
+
+### Class Structure
+
+```csharp
+namespace InapescaWeb.DAL
+{
+    public class MngConexion
+    {
+        // Main SMAF database connection
+        public static MySqlConnection ConexionMysql;
+        
+        // DGAIPP module database connection  
+        public static MySqlConnection ConexionMysql1;
+        
+        // Contracts module database connection
+        public static MySqlConnection ConexionMysql2;
+        
+        // Connection factory methods
+        public static MySqlConnection getConexionMysql()
+        public static MySqlConnection getConexionMysql_dgaipp()
+        public static MySqlConnection getConexionMysql_Contratos()
+        public static MySqlConnection getConexionMysql_ModuloConsulta()
+        
+        // Disposal methods
+        public static void disposeConexion()
+        public static void disposeConexionSMAF(MySqlConnection pMysqlConexionMysql)
+        public static void disposeConexionMC(MySqlConnection pMysqlConexionMysql)
+        public static void disposeConexion_dgaipp(MySqlConnection pMysqlConexionMysql)
+    }
+}
+```
+
+## Connection String Encryption
+
+### Encryption Implementation
+
+All connection strings are stored **encrypted** in `Web.config` using Rijndael (AES) encryption. This prevents exposure of database credentials in configuration files.
+
+**Encryption class:** `MngEncriptacion`
+
+```csharp
+public class MngEncriptacion
+{
+    private static byte[] _key = Encoding.ASCII.GetBytes("InapescaWeb");
+    private static byte[] _iv = Encoding.ASCII.GetBytes("InapescaWeb.Mysql");
+
+    public static string encryptString(string cadena)
+    {
+        byte[] inputBytes = Encoding.ASCII.GetBytes(cadena);
+        RijndaelManaged cripto = new RijndaelManaged();
+        
+        using (MemoryStream ms = new MemoryStream(inputBytes.Length))
+        {
+            using (CryptoStream objCryptoStream = new CryptoStream(
+                ms, cripto.CreateEncryptor(_key, _iv), CryptoStreamMode.Write))
+            {
+                objCryptoStream.Write(inputBytes, 0, inputBytes.Length);
+                objCryptoStream.FlushFinalBlock();
+            }
+            return Convert.ToBase64String(ms.ToArray());
+        }
+    }
+
+    public static string decripString(string cadena)
+    {
+        byte[] inputBytes = Convert.FromBase64String(cadena);
+        RijndaelManaged cripto = new RijndaelManaged();
+        
+        using (MemoryStream ms = new MemoryStream(inputBytes))
+        using (CryptoStream objCryptoStream = new CryptoStream(
+            ms, cripto.CreateDecryptor(_key, _iv), CryptoStreamMode.Read))
+        using (StreamReader sr = new StreamReader(objCryptoStream, true))
+        {
+            return sr.ReadToEnd();
+        }
+    }
+}
+```
+
+### Connection Retrieval Process
+
+**Main SMAF Database Connection:**
+
+```csharp
+public static MySqlConnection getConexionMysql()
+{
+    // Retrieve encrypted connection string from Web.config
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost"];
+    
+    // Decrypt the connection string
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    
+    // Create and return new MySQL connection
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+```
+
+<Note>
+The connection string key can be switched between environments:
+- **Development:** `ConfigurationManager.AppSettings["localhost"]`
+- **Production:** `ConfigurationManager.AppSettings["Inapesca.Info"]` (commented out)
+
+Switch by commenting/uncommenting the appropriate line before deployment.
+</Note>
+
+### Web.config Configuration
+
+Connection strings are stored in the `<appSettings>` section:
+
+```xml
+<appSettings>
+  <!-- Encrypted connection strings -->
+  <add key="localhost" value="[Base64EncodedEncryptedString]" />
+  <add key="localhostContratos" value="[Base64EncodedEncryptedString]" />
+  <add key="localhost_dgaipp" value="[Base64EncodedEncryptedString]" />
+  <add key="RemoteModuloConsulta" value="[Base64EncodedEncryptedString]" />
+</appSettings>
+```
+
+**Decrypted connection string format:**
+
+```
+Server=localhost;Database=smaf;Uid=username;Pwd=password;CharSet=utf8;
+```
+
+## Multiple Database Support
+
+SMAF connects to multiple databases for different functional modules:
+
+### 1. Main SMAF Database
+
+```csharp
+public static MySqlConnection getConexionMysql()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+```
+
+**Usage:** Travel commissions, users, projects, allowances
+
+### 2. DGAIPP Module Database
+
+```csharp
+public static MySqlConnection getConexionMysql_dgaipp()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhost_dgaipp"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql1 = new MySqlConnection(CadenaConexion);
+    return ConexionMysql1;
+}
+```
+
+**Usage:** DGAIPP (Dirección General Adjunta de Investigación en Acuacultura e Infraestructura Pesquera) specific operations
+
+### 3. Contracts Database
+
+```csharp
+public static MySqlConnection getConexionMysql_Contratos()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["localhostContratos"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql2 = new MySqlConnection(CadenaConexion);
+    return ConexionMysql2;
+}
+```
+
+**Usage:** Contract management module
+
+### 4. Consultation Module Database
+
+```csharp
+public static MySqlConnection getConexionMysql_ModuloConsulta()
+{
+    string CadenaConexionEncriptada = 
+        ConfigurationManager.AppSettings["RemoteModuloConsulta"];
+    string CadenaConexion = 
+        MngEncriptacion.decripString(CadenaConexionEncriptada);
+    ConexionMysql = new MySqlConnection(CadenaConexion);
+    return ConexionMysql;
+}
+```
+
+**Usage:** Remote consultation and reporting module
+
+## Connection Disposal
+
+### Standard Disposal Pattern
+
+The `disposeConexionSMAF` method is the primary disposal mechanism:
+
+```csharp
+public static void disposeConexionSMAF(MySqlConnection pMysqlConexionMysql)
+{
+    pMysqlConexionMysql.Close();
+    pMysqlConexionMysql.Dispose();
+    pMysqlConexionMysql = null;
+}
+```
+
+**Usage in DAL methods:**
+
+```csharp
+public static List<Entidad> ObtainData()
+{
+    string Query = "SELECT * FROM table";
+    
+    MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+    MySqlCommand cmd = new MySqlCommand(Query, ConexionMysql);
+    cmd.Connection.Open();
+    MySqlDataReader Reader = cmd.ExecuteReader();
+    
+    List<Entidad> lista = new List<Entidad>();
+    
+    while (Reader.Read())
+    {
+        // Process data...
+    }
+    
+    Reader.Close();
+    MngConexion.disposeConexionSMAF(ConexionMysql);  // ← Always dispose
+    
+    return lista;
+}
+```
+
+### Module-Specific Disposal
+
+**DGAIPP Module:**
+
+```csharp
+public static void disposeConexion_dgaipp(MySqlConnection pMysqlConexionMysql)
+{
+    if (ConexionMysql1.State == ConnectionState.Open)
+    {
+        pMysqlConexionMysql.Close();
+        pMysqlConexionMysql.Dispose();
+        pMysqlConexionMysql = null;
+    }
+}
+```
+
+**Contracts Module:**
+
+```csharp
+public static void disposeConexionMC(MySqlConnection pMysqlConexionMysql)
+{
+    pMysqlConexionMysql.Close();
+    pMysqlConexionMysql.Dispose();
+    pMysqlConexionMysql = null;
+}
+```
+
+<Warning>
+**Critical Disposal Rules:**
+
+1. Always close `MySqlDataReader` before disposing the connection
+2. Call the appropriate `dispose` method for each connection type
+3. Never reuse connection objects after disposal
+4. Ensure disposal happens even if exceptions occur
+</Warning>
+
+## Connection Pooling
+
+### MySqlConnection Provider Pooling
+
+MySQL connection pooling is **automatically managed** by the `MySql.Data.MySqlClient` library:
+
+- Connections are pooled by connection string
+- Default pool size: 100 connections
+- Connections are reused when `Close()` is called
+- Physical connections persist in the pool for reuse
+
+**Connection string pooling parameters:**
+
+```
+Server=localhost;Database=smaf;Uid=user;Pwd=pass;
+Min Pool Size=5;
+Max Pool Size=100;
+Connection Lifetime=300;
+```
+
+### Pooling Behavior
+
+```
+getConexionMysql() → Creates/Retrieves from pool
+        ↓
+    Open()
+        ↓
+  Execute queries
+        ↓
+    Close()
+        ↓
+    Dispose() → Returns to pool (doesn't destroy)
+        ↓
+Connection available for reuse
+```
+
+<Note>
+Even though code calls `Dispose()` and sets the reference to `null`, the underlying physical connection returns to the pool and can be reused by subsequent connection requests.
+</Note>
+
+## Error Handling
+
+### Connection Error Strategy
+
+Connection errors are typically handled at the business layer:
+
+```csharp
+// DAL method doesn't throw - returns empty result on failure
+public static string GetValue(string id)
+{
+    string result = "";
+    try
+    {
+        MySqlConnection ConexionMysql = MngConexion.getConexionMysql();
+        MySqlCommand cmd = new MySqlCommand(query, ConexionMysql);
+        cmd.Connection.Open();
+        MySqlDataReader Reader = cmd.ExecuteReader();
+        
+        if (Reader.Read())
+        {
+            result = Convert.ToString(Reader["VALUE"]);
+        }
+        
+        Reader.Close();
+        MngConexion.disposeConexionSMAF(ConexionMysql);
+    }
+    catch (Exception ex)
+    {
+        // Log error, return empty result
+        result = "";
+    }
+    
+    return result;
+}
+```
+
+### Common Connection Issues
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| "Unable to connect to any of the specified MySQL hosts" | Database server down or unreachable | Check MySQL service status |
+| "Access denied for user" | Invalid credentials | Verify encrypted connection string |
+| "Unknown database" | Database doesn't exist | Create database or fix connection string |
+| "Too many connections" | Connection pool exhausted | Ensure proper connection disposal |
+
+## Best Practices
+
+<Note>
+**Connection Management Checklist:**
+
+✓ Always use `MngConexion.getConexionMysql()` - never create connections directly
+
+✓ Close DataReaders before disposing connections
+
+✓ Call `disposeConexionSMAF()` in all code paths (success and error)
+
+✓ Use appropriate connection method for the target database
+
+✓ Never store connection strings unencrypted
+
+✓ Avoid holding connections open longer than necessary
+
+✓ Don't share connection objects between threads
+</Note>
+
+## Related Documentation
+
+- [Data Operations Patterns](/technical/dal/data-operations)
+- [DAL Overview](/technical/dal/overview)
+- [Configuration Management](/technical/configuration/web-config)
